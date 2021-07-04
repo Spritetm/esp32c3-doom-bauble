@@ -61,25 +61,85 @@
 
 #include "global_data.h"
 
-//
-// Starting a sound means adding it
-//  to the current list of active sounds
-//  in the internal channels.
-// As the SFX info struct contains
-//  e.g. a pointer to the raw data,
-//  it is ignored.
-// As our sound handling does not handle
-//  priority, it is ignored.
-// Pitching (that is, increased speed of playback)
-//  is set, but currently not used by mixing.
-//
-int I_StartSound(int id, int channel, int vol, int sep)
-{
-	if ((channel < 0) || (channel >= MAX_CHANNELS))
+#include "snd_c3.h"
+
+#define RATE 11025
+
+typedef int32_t fixed_pt_t; //24.8 fixed point format
+#define TO_FIXED(x) ((x)<<8)
+#define FROM_FIXED(x) ((x)>>8)
+
+typedef struct {
+	uint8_t *samp; //NULL if slot is disabled
+	int vol;
+	fixed_pt_t rate_inc; //every output sample, pos is increased by this
+	fixed_pt_t len;
+	fixed_pt_t pos;
+} snd_slot_t;
+
+#define NO_SLOT 4
+
+snd_slot_t slot[NO_SLOT];
+
+void snd_cb(int8_t *buf, int len) {
+	for (int p=0; p<len; p++) {
+		int samp=0;
+		for (int i=0; i<NO_SLOT; i++) {
+			if (slot[i].samp) {
+				samp+=slot[i].samp[FROM_FIXED(slot[i].pos)];
+				//increase, unload if end
+				slot[i].pos+=slot[i].rate_inc;
+				if (slot[i].pos > slot[i].len) {
+					printf("Slot %d done\n", i);
+					slot[i].samp=NULL;
+				}
+			}
+		}
+//		samp=samp/NO_SLOT;
+		if (samp>127) samp=127;
+		if (samp<-128) samp=-128;
+		buf[p]=samp;
+	}
+}
+
+typedef struct {
+	uint16_t format_no;
+	uint16_t samp_rate;
+	uint32_t samp_ct;
+	uint8_t pad[16];
+	uint8_t samples[0];
+} dmx_samp_t;
+
+int lumpnum_for_sndid(int id) {
+	char namebuf[9];
+	sprintf(namebuf, "ds%s", S_sfx[id].name);
+	for (int i=0; i<9; i++) {
+		if (namebuf[i]>='a' && namebuf[i]<='z') {
+			namebuf[i]-=32;
+		}
+	}
+	int r=W_GetNumForName(namebuf);
+	printf("lumpnum_for_sndid: id %d is %s -> lump %d\n", id, namebuf, r);
+	return r;
+}
+
+
+int I_StartSound(int id, int channel, int vol, int sep) {
+	if ((channel < 0) || (channel >= NO_SLOT))
 		return -1;
 
-	printf("STUB: I_StartSound id=%d channel=%d\n", id, channel);
-
+	printf("STUB: I_StartSound id=%d channel=%d vol=%d\n", id, channel, vol);
+	dmx_samp_t *snd=(dmx_samp_t*)W_CacheLumpNum(lumpnum_for_sndid(id));
+	if (snd->format_no!=3) {
+		printf("I_StartSound: unknown format %d\n", snd->format_no);
+		return -1;
+	}
+	slot[channel].samp=NULL;
+	slot[channel].vol=vol;
+	slot[channel].rate_inc=TO_FIXED(snd->samp_rate)/RATE;
+	slot[channel].len=TO_FIXED(snd->samp_ct);
+	slot[channel].pos=0;
+	slot[channel].samp=&snd->samples[0];
 	return channel;
 }
 
@@ -96,6 +156,7 @@ void I_ShutdownSound(void)
 
 void I_InitSound(void) {
 	I_InitMusic();
+	snd_init(RATE, snd_cb);
 
 	// Finished initialization.
     lprintf(LO_INFO,"I_InitSound: sound ready");
@@ -106,24 +167,23 @@ void I_InitMusic(void) {
 }
 
 void I_PlaySong(int handle, int looping) {
-    if(handle == mus_None)
-        return;
+    if(handle == mus_None) return;
 	printf("STUB: I_PlaySong %d\n", handle);
 }
 
 
 void I_PauseSong (int handle){
-	printf("STUB: I_PauseSong %d\n", handle);
+//	printf("STUB: I_PauseSong %d\n", handle);
 }
 
 void I_ResumeSong (int handle) {
-	printf("STUB: I_ResumeSong %d\n", handle);
+//	printf("STUB: I_ResumeSong %d\n", handle);
 }
 
 void I_StopSong(int handle) {
-	printf("STUB: I_StopSong %d\n", handle);
+//	printf("STUB: I_StopSong %d\n", handle);
 }
 
 void I_SetMusicVolume(int volume) {
-	printf("STUB: I_SetMusicVolume %d\n", volume);
+//	printf("STUB: I_SetMusicVolume %d\n", volume);
 }
