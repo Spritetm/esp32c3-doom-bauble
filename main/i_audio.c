@@ -63,9 +63,9 @@
 
 #include "snd_c3.h"
 
-#include "opl3.h"
+#include "dbopl.h"
 
-#define RATE 11025
+#define RATE (11025*2)
 
 typedef int32_t fixed_pt_t; //24.8 fixed point format
 #define TO_FIXED(x) ((x)<<8)
@@ -97,7 +97,7 @@ typedef struct {
 	int pos;
 	int len;
 	int delay_to_go;
-	opl3_chip opl;
+	Chip opl;
 } imf_player_t;
 
 static imf_player_t imfplayer;
@@ -109,7 +109,7 @@ static void imf_player_tick(int samps) {
 		//handle next imf packet
 		imfplayer.pos++;
 		if (imfplayer.pos==imfplayer.len) imfplayer.pos=0;
-		OPL3_WriteReg(&imfplayer.opl, imfplayer.imf[imfplayer.pos].reg, imfplayer.imf[imfplayer.pos].data);
+		Chip__WriteReg(&imfplayer.opl, imfplayer.imf[imfplayer.pos].reg, imfplayer.imf[imfplayer.pos].data);
 		samps-=imfplayer.delay_to_go;
 		imfplayer.delay_to_go=(imfplayer.imf[imfplayer.pos].delay*RATE)/IMF_RATE;
 	}
@@ -118,9 +118,15 @@ static void imf_player_tick(int samps) {
 
 
 static void snd_cb(int8_t *buf, int len) {
+	static int32_t *oplblk=NULL;
+	if (!oplblk) {
+		oplblk=calloc(len, sizeof(int32_t));
+		assert(oplblk);
+	}
 	imf_player_tick(len);
+	Chip__GenerateBlock2(&imfplayer.opl, len, oplblk);
 	for (int p=0; p<len; p++) {
-		int samp=0;
+		int samp=oplblk[p]/64;
 		for (int i=0; i<NO_SLOT; i++) {
 			if (slot[i].samp) {
 				samp+=slot[i].samp[FROM_FIXED(slot[i].pos)];
@@ -132,10 +138,6 @@ static void snd_cb(int8_t *buf, int len) {
 				}
 			}
 		}
-		int16_t oplsamps[2];
-//		OPL3_GenerateResampled(&imfplayer.opl, oplsamps);
-		int oplsamp=(((int)oplsamps[0]+(int)oplsamps[1])>>9);
-		samp+=oplsamp;
 #if 0
 		samp=samp/NO_SLOT;
 #else
@@ -212,7 +214,9 @@ void I_InitSound(void) {
 
 
 void I_InitMusic(void) {
-	OPL3_Reset(&imfplayer.opl, RATE);
+	DBOPL_InitTables();
+	Chip__Chip(&imfplayer.opl);
+	Chip__Setup(&imfplayer.opl, RATE);
 	imfplayer.imf=NULL;
 }
 

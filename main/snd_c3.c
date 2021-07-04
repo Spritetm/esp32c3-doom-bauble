@@ -17,7 +17,7 @@ const char *TAG="sndc3";
 
 #define RATE(x) (40000000/x)
 
-#define BUFSZ 1024
+#define BUFSZ 128
 
 static QueueHandle_t sampqueue;
 static int8_t *pbuf;
@@ -97,6 +97,6 @@ void snd_init(int samprate, snd_cb_t *cb) {
 	timer_start(group, timer);
 
 	//Start task to handle sound stuff
-	xTaskCreate(snd_task, "snd", 16*1024, NULL, 5, NULL);
+	xTaskCreate(snd_task, "snd", 4*1024, NULL, 5, NULL);
 }
 
