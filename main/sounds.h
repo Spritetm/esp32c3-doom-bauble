@@ -63,6 +63,16 @@ struct sfxinfo_struct {
   int ticks;
 };
 
+struct musicinfo_struct;
+
+typedef struct musicinfo_struct musicinfo_t;
+
+struct musicinfo_struct {
+	const char *name;
+};
+
+extern const musicinfo_t S_music[];
+
 //
 // MusicInfo struct.
 //

@@ -63,6 +63,8 @@
 
 #include "snd_c3.h"
 
+#include "opl3.h"
+
 #define RATE 11025
 
 typedef int32_t fixed_pt_t; //24.8 fixed point format
@@ -81,7 +83,42 @@ typedef struct {
 
 snd_slot_t slot[NO_SLOT];
 
-void snd_cb(int8_t *buf, int len) {
+typedef struct {
+	uint8_t reg;
+	uint8_t data;
+	uint16_t delay;
+} imf_packet_t;
+
+//imf is 700Hz tick
+#define IMF_RATE 700
+
+typedef struct {
+	imf_packet_t *imf;
+	int pos;
+	int len;
+	int delay_to_go;
+	opl3_chip opl;
+} imf_player_t;
+
+static imf_player_t imfplayer;
+
+
+static void imf_player_tick(int samps) {
+	if (!imfplayer.imf) return;
+	while (imfplayer.delay_to_go < samps) {
+		//handle next imf packet
+		imfplayer.pos++;
+		if (imfplayer.pos==imfplayer.len) imfplayer.pos=0;
+		OPL3_WriteReg(&imfplayer.opl, imfplayer.imf[imfplayer.pos].reg, imfplayer.imf[imfplayer.pos].data);
+		samps-=imfplayer.delay_to_go;
+		imfplayer.delay_to_go=(imfplayer.imf[imfplayer.pos].delay*RATE)/IMF_RATE;
+	}
+	imfplayer.delay_to_go-=samps;
+}
+
+
+static void snd_cb(int8_t *buf, int len) {
+	imf_player_tick(len);
 	for (int p=0; p<len; p++) {
 		int samp=0;
 		for (int i=0; i<NO_SLOT; i++) {
@@ -95,9 +132,16 @@ void snd_cb(int8_t *buf, int len) {
 				}
 			}
 		}
-//		samp=samp/NO_SLOT;
+		int16_t oplsamps[2];
+//		OPL3_GenerateResampled(&imfplayer.opl, oplsamps);
+		int oplsamp=(((int)oplsamps[0]+(int)oplsamps[1])>>9);
+		samp+=oplsamp;
+#if 0
+		samp=samp/NO_SLOT;
+#else
 		if (samp>127) samp=127;
 		if (samp<-128) samp=-128;
+#endif
 		buf[p]=samp;
 	}
 }
@@ -110,14 +154,18 @@ typedef struct {
 	uint8_t samples[0];
 } dmx_samp_t;
 
-int lumpnum_for_sndid(int id) {
-	char namebuf[9];
-	sprintf(namebuf, "ds%s", S_sfx[id].name);
-	for (int i=0; i<9; i++) {
+static void namebuf_upper(char *namebuf) {
+	for (int i=0; i<8; i++) {
 		if (namebuf[i]>='a' && namebuf[i]<='z') {
 			namebuf[i]-=32;
 		}
 	}
+}
+
+int lumpnum_for_sndid(int id) {
+	char namebuf[9];
+	sprintf(namebuf, "ds%s", S_sfx[id].name);
+	namebuf_upper(namebuf);
 	int r=W_GetNumForName(namebuf);
 	printf("lumpnum_for_sndid: id %d is %s -> lump %d\n", id, namebuf, r);
 	return r;
@@ -162,13 +210,24 @@ void I_InitSound(void) {
     lprintf(LO_INFO,"I_InitSound: sound ready");
 }
 
+
 void I_InitMusic(void) {
-	printf("STUB: I_InitMusic\n");
+	OPL3_Reset(&imfplayer.opl, RATE);
+	imfplayer.imf=NULL;
 }
 
 void I_PlaySong(int handle, int looping) {
     if(handle == mus_None) return;
-	printf("STUB: I_PlaySong %d\n", handle);
+	
+	char namebuf[9];
+	sprintf(namebuf, "d_%s", S_music[handle].name);
+	namebuf_upper(namebuf);
+	printf("STUB: I_PlaySong %d (%s)\n", handle, namebuf);
+	int lump=W_GetNumForName(namebuf);
+	imfplayer.imf=(imf_packet_t*)W_CacheLumpNum(lump);
+	imfplayer.pos=0;
+	imfplayer.len=W_LumpLength(lump)/sizeof(imf_packet_t);
+	imfplayer.delay_to_go=0;
 }
 
 

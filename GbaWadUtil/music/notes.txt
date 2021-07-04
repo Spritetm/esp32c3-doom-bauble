@@ -1,0 +1,6 @@
+How to get these files?
+
+- Extract mus files from doom1.wad using e.g. Deutex (rename doom1.wad to doom.wad first)
+- Convert mus files to imf format using imfcreator - https://github.com/adambiser/imf-creator
+ ./midi2imf.py -gm2 file.mus imf0
+

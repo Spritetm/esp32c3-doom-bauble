@@ -97,6 +97,6 @@ void snd_init(int samprate, snd_cb_t *cb) {
 	timer_start(group, timer);
 
 	//Start task to handle sound stuff
-	xTaskCreate(snd_task, "snd", 8*1024, NULL, 5, NULL);
+	xTaskCreate(snd_task, "snd", 16*1024, NULL, 5, NULL);
 }
 

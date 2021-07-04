@@ -81,7 +81,7 @@
  */
 
 const unsigned char *doom_iwad;
-const unsigned int doom_iwad_len=4585461;
+const unsigned int doom_iwad_len=4978361;
 
 void I_Init(void)
 {

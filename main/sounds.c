@@ -41,6 +41,48 @@
 #include "doomtype.h"
 #include "sounds.h"
 
+
+#define MUSIC(name) \
+    { name }
+
+const musicinfo_t S_music[] =
+{
+    MUSIC(NULL),
+    MUSIC("e1m1"),
+    MUSIC("e1m2"),
+    MUSIC("e1m3"),
+    MUSIC("e1m4"),
+    MUSIC("e1m5"),
+    MUSIC("e1m6"),
+    MUSIC("e1m7"),
+    MUSIC("e1m8"),
+    MUSIC("e1m9"),
+    MUSIC("e2m1"),
+    MUSIC("e2m2"),
+    MUSIC("e2m3"),
+    MUSIC("e2m4"),
+    MUSIC("e2m5"),
+    MUSIC("e2m6"),
+    MUSIC("e2m7"),
+    MUSIC("e2m8"),
+    MUSIC("e2m9"),
+    MUSIC("e3m1"),
+    MUSIC("e3m2"),
+    MUSIC("e3m3"),
+    MUSIC("e3m4"),
+    MUSIC("e3m5"),
+    MUSIC("e3m6"),
+    MUSIC("e3m7"),
+    MUSIC("e3m8"),
+    MUSIC("e3m9"),
+    MUSIC("inter"),
+    MUSIC("intro"),
+    MUSIC("bunny"),
+    MUSIC("victor"),
+    MUSIC("introa"),
+};
+
+
 //
 // Information about all the sfx
 //
