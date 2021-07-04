@@ -60,6 +60,8 @@
 #include "w_wad.h"
 #include "st_stuff.h"
 #include "lprintf.h"
+#include "lcd.h"
+#include "btn.h"
 
 #include "global_data.h"
 
@@ -81,11 +83,12 @@ void I_StartFrame (void)
 
 }
 
-static unsigned short* backbuffer=NULL;
+static uint8_t* backbuffer=NULL;
+static uint8_t* frontbuffer=NULL;
+static uint16_t frontpal[256];
 
 boolean I_StartDisplay(void)
 {
-	if (backbuffer==NULL) backbuffer = malloc(SCREENHEIGHT*SCREENWIDTH*2);
     _g->screens[0].data = backbuffer;
 
     // Same with base row offset.
@@ -94,8 +97,13 @@ boolean I_StartDisplay(void)
     return true;
 }
 
+#define NO_PALETTE_CHANGE 1000
+
+
 
 void I_EndDisplay(void) {
+#if 0
+//bad ascii art (as it doesn't take into account palette)
 	printf("\033[1;1H");
 	for (int y=0; y<SCREENHEIGHT; y+=5) {
 		for (int x=0; x<SCREENWIDTH; x+=1) {
@@ -109,6 +117,24 @@ void I_EndDisplay(void) {
 		}
 		printf("\n");
 	}
+#else
+	//flip front and backbuffer
+	uint8_t *t=backbuffer;
+	backbuffer=frontbuffer;
+	frontbuffer=t;
+
+	lcd_render_finish();
+
+//    if (_g->newpal != NO_PALETTE_CHANGE) {
+		if(!_g->pallete_lump) {
+			_g->pallete_lump = W_CacheLumpName("PLAYPAL");
+		}
+		_g->current_pallete = &_g->pallete_lump[_g->newpal*256*3];
+		lcd_set_pal(_g->current_pallete);
+//		_g->newpal = NO_PALETTE_CHANGE;
+//	}
+	lcd_render_fb(frontbuffer);
+#endif
 }
 
 
@@ -137,9 +163,6 @@ static void I_UploadNewPalette(int pal)
     }
 
     _g->current_pallete = &_g->pallete_lump[pal*256*3];
-
-
-//    I_SetPallete_e32(_g->current_pallete);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -159,31 +182,24 @@ void I_UpdateNoBlit (void)
 //
 // I_FinishUpdate
 //
-#define NO_PALETTE_CHANGE 1000
-
-void I_FinishUpdate (void)
-{
-    if (_g->newpal != NO_PALETTE_CHANGE)
-	{
-        I_UploadNewPalette(_g->newpal);
-        _g->newpal = NO_PALETTE_CHANGE;
-	}
-
-//    I_FinishUpdate_e32(_g->screens[0].data, _g->current_pallete, SCREENWIDTH, SCREENHEIGHT);
+void I_FinishUpdate (void) {
 }
 
 //
 // I_SetPalette
 //
-void I_SetPalette (int pal)
-{
+void I_SetPalette (int pal) {
     _g->newpal = pal;
 }
 
 
-void I_PreInitGraphics(void)
-{
-//	I_InitScreen_e32();
+void I_PreInitGraphics(void) {
+	if (backbuffer==NULL) backbuffer = malloc(SCREENHEIGHT*SCREENWIDTH*2);
+	if (frontbuffer==NULL) frontbuffer = malloc(SCREENHEIGHT*SCREENWIDTH*2);
+	assert(backbuffer);
+	assert(frontbuffer);
+	lcd_init();
+	btn_init();
 }
 
 // CPhipps -
@@ -214,7 +230,6 @@ void I_InitGraphics(void)
         /* Initialize the input system */
         I_InitInputs();
 
-//        I_CreateBackBuffer_e32();
     }
 }
 

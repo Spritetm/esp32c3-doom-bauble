@@ -81,13 +81,11 @@
  */
 
 const unsigned char *doom_iwad;
-const unsigned int doom_iwad_len=3842044;
-
+const unsigned int doom_iwad_len=4585461;
 
 void I_Init(void)
 {
-    if (!(nomusicparm && nosfxparm))
-        I_InitSound();
+    I_InitSound();
 }
 
 static void PrintVer(void)

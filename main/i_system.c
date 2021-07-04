@@ -43,10 +43,16 @@
 #include "i_system.h"
 #include "doomdef.h"
 #include "lprintf.h"
+#include "d_main.h"
+#include "d_event.h"
+#include "global_data.h"
+#include "tables.h"
+
 
 #include "i_system.h"
 
 #include "global_data.h"
+#include "btn.h"
 
 
 /* cphipps - I_GetVersionString
@@ -82,8 +88,30 @@ void I_Error (const char *error, ...)
 	I_Quit();
 }
 
+static int old_btn;
+
+
+//Mappings form BTN_MASK_* bit offset to Doom keys
+static const int keys[]={KEYD_LEFT, KEYD_DOWN, KEYD_RIGHT, KEYD_UP, KEYD_A, KEYD_B};
+
 void I_ProcessKeyEvents() {
-	//stub
+	int btn=btn_get_bitmap();
+	int btn_pressed=(btn^old_btn)&btn;
+	int btn_released=(btn^old_btn)&old_btn;
+	event_t ev;
+	for (int i=0; i<6; i++) {
+		if (btn_pressed & (1<<i)) {
+			ev.type=ev_keydown;
+			ev.data1=keys[i];
+			D_PostEvent(&ev);
+		}
+		if (btn_released & (1<<i)) {
+			ev.type=ev_keyup;
+			ev.data1=keys[i];
+			D_PostEvent(&ev);
+		}
+	}
+	old_btn=btn;
 }
 
 void I_Quit() {
