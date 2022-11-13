@@ -68,6 +68,7 @@
 #include "i_main.h"
 #include "lprintf.h"
 #include "global_data.h"
+#include "input.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -99,6 +100,8 @@ void app_main() {
 	spi_flash_mmap_handle_t mmap_handle;
 	esp_partition_mmap(part, 0, doom_iwad_len, SPI_FLASH_MMAP_DATA, &doom_iwad, &mmap_handle);
 
+	input_init();
+
     /* cphipps - call to video specific startup code */
     I_PreInitGraphics();
 
@@ -109,5 +112,4 @@ void app_main() {
     InitGlobals();
 
     D_DoomMain ();
-    return 0;
 }

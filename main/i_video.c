@@ -61,7 +61,6 @@
 #include "st_stuff.h"
 #include "lprintf.h"
 #include "lcd.h"
-#include "btn.h"
 
 #include "global_data.h"
 
@@ -199,7 +198,6 @@ void I_PreInitGraphics(void) {
 	assert(backbuffer);
 	assert(frontbuffer);
 	lcd_init();
-	btn_init();
 }
 
 // CPhipps -

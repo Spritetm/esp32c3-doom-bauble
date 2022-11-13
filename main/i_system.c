@@ -47,12 +47,12 @@
 #include "d_event.h"
 #include "global_data.h"
 #include "tables.h"
-
+#include "input.h"
 
 #include "i_system.h"
 
 #include "global_data.h"
-#include "btn.h"
+#include "hid_ev.h"
 
 
 /* cphipps - I_GetVersionString
@@ -90,28 +90,37 @@ void I_Error (const char *error, ...)
 
 static int old_btn;
 
-
-//Mappings form BTN_MASK_* bit offset to Doom keys
-static const int keys[]={KEYD_LEFT, KEYD_DOWN, KEYD_RIGHT, KEYD_UP, KEYD_A, KEYD_B};
+//KEYD_LEFT, KEYD_DOWN, KEYD_RIGHT, KEYD_UP, KEYD_A, KEYD_B, L, R, START, SELECT
 
 void I_ProcessKeyEvents() {
-	int btn=btn_get_bitmap();
-	int btn_pressed=(btn^old_btn)&btn;
-	int btn_released=(btn^old_btn)&old_btn;
+	hid_ev_t hev;
 	event_t ev;
-	for (int i=0; i<6; i++) {
-		if (btn_pressed & (1<<i)) {
-			ev.type=ev_keydown;
-			ev.data1=keys[i];
+	while (input_get_event(&hev)) {
+		if (hev.type==HIDEV_EVENT_KEY_DOWN || hev.type==HIDEV_EVENT_KEY_UP) {
+			//todo: keyboard
+		} else if (hev.type==HIDEV_EVENT_JOY_AXIS && hev.no<2) {
+			ev.type=(hev.joyaxis.pos>10000 || hev.joyaxis.pos<-10000)?ev_keydown:ev_keyup;
+			if (hev.no==0) ev.data1=(hev.joyaxis.pos>0)?KEYD_RIGHT:KEYD_LEFT;
+			if (hev.no==1) ev.data1=(hev.joyaxis.pos>0)?KEYD_DOWN:KEYD_UP;
 			D_PostEvent(&ev);
-		}
-		if (btn_released & (1<<i)) {
-			ev.type=ev_keyup;
-			ev.data1=keys[i];
-			D_PostEvent(&ev);
+		} else if (hev.type==HIDEV_EVENT_JOY_BUTTONDOWN || hev.type==HIDEV_EVENT_JOY_BUTTONUP) {
+			const int btns[]={KEYD_A, KEYD_B, KEYD_A, KEYD_B, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START};
+			if (hev.no<8) {
+				ev.type=(hev.type==HIDEV_EVENT_JOY_BUTTONDOWN)?ev_keydown:ev_keyup;
+				ev.data1=btns[hev.no];
+				D_PostEvent(&ev);
+			}
+		} else if (hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN || hev.type==HIDEV_EVENT_MOUSE_BUTTONUP) {
+			const int btns[]={KEYD_A, KEYD_B, KEYD_START, KEYD_SELECT, KEYD_L, KEYD_R};
+			if (hev.no<6) {
+				ev.type=(hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN)?ev_keydown:ev_keyup;
+				ev.data1=btns[hev.no];
+				D_PostEvent(&ev);
+			}
+		} else if (hev.type==HIDEV_EVENT_MOUSE_MOTION) {
+			//todo: mouse
 		}
 	}
-	old_btn=btn;
 }
 
 void I_Quit() {

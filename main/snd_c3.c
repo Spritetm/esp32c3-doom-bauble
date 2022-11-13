@@ -49,13 +49,14 @@ void snd_task(void *arg) {
 	assert(buf_b);
 	while(1) {
 		snd_cb(buf_a, BUFSZ);
-		xQueueSend(sampqueue, &buf_a, portMAX_DELAY);
+//		xQueueSend(sampqueue, &buf_a, portMAX_DELAY);
 		snd_cb(buf_b, BUFSZ);
-		xQueueSend(sampqueue, &buf_b, portMAX_DELAY);
+//		xQueueSend(sampqueue, &buf_b, portMAX_DELAY);
 	}
 }
 
 void snd_init(int samprate, snd_cb_t *cb) {
+	return;
 	rate=samprate;
 	snd_cb=cb;
 	sampqueue=xQueueCreate(1, sizeof(uint8_t*));
@@ -65,10 +66,10 @@ void snd_init(int samprate, snd_cb_t *cb) {
 		.channel=SIGMADELTA_CHANNEL_0,
 		.sigmadelta_duty=0,
 		.sigmadelta_prescale=10,
-		.sigmadelta_gpio=10,
+		.sigmadelta_gpio=0,
 	};
 	ESP_ERROR_CHECK(sigmadelta_config(&sdconfig));
-	sdconfig.sigmadelta_gpio=9;
+	sdconfig.sigmadelta_gpio=1;
 	sdconfig.channel=SIGMADELTA_CHANNEL_1;
 	ESP_ERROR_CHECK(sigmadelta_config(&sdconfig));
 

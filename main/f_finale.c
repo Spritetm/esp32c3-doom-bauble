@@ -566,7 +566,7 @@ static const char pfub1[] = { "PFUB1" };
 
 static void F_BunnyScroll (void)
 {
-    char        name[10];
+    char        name[16];
     int         stage;
 
     {

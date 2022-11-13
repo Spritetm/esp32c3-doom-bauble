@@ -8,67 +8,197 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 
-#define PIN_NUM_MISO 9
-#define PIN_NUM_MOSI 5
-#define PIN_NUM_CLK	 6
-#define PIN_NUM_CS	 7
+#define PIN_NUM_MISO -1
+#define PIN_NUM_MOSI 9
+#define PIN_NUM_CLK	 8
+#define PIN_NUM_CS	 5
 
-#define PIN_NUM_DC	 4
-#define PIN_NUM_RST	 10
-#define PIN_NUM_BCKL 8
+#define PIN_NUM_DC	 7
+#define PIN_NUM_RST	 6
+#define PIN_NUM_BCKL 4
 
 #define PARALLEL_LINES 20
 
-/*
- The LCD needs a bunch of command/argument values to be initialized. They are stored in this struct.
-*/
-typedef struct {
-	uint8_t cmd;
-	uint8_t data[16];
-	uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
-} lcd_init_cmd_t;
+#define ST7735_MADCTL_BGR 0x08
+#define ST7735_MADCTL_MH  0x04
 
-typedef enum {
-	LCD_TYPE_ILI = 1,
-	LCD_TYPE_ST,
-	LCD_TYPE_MAX,
-} type_lcd_t;
+#define ST7735_FRMCTR1 0xB1
+#define ST7735_FRMCTR2 0xB2
+#define ST7735_FRMCTR3 0xB3
+#define ST7735_INVCTR  0xB4
+#define ST7735_DISSET5 0xB6
 
-DRAM_ATTR static const lcd_init_cmd_t init_cmds[]={
-    /* Memory Data Access Control, MX=MV=1, MY=ML=MH=0, RGB=0 */
-    {0x36, {0}, 1},
-    /* Interface Pixel Format, 16bits/pixel for RGB/MCU interface */
-    {0x3A, {0x55}, 1},
-    /* Porch Setting */
-    {0xB2, {0x0c, 0x0c, 0x00, 0x33, 0x33}, 5},
-    /* Gate Control, Vgh=13.65V, Vgl=-10.43V */
-    {0xB7, {0x45}, 1},
-    /* VCOM Setting, VCOM=1.175V */
-    {0xBB, {0x2B}, 1},
-    /* LCM Control, XOR: BGR, MX, MH */
-    {0xC0, {0x2C}, 1},
-    /* VDV and VRH Command Enable, enable=1 */
-    {0xC2, {0x01, 0xff}, 2},
-    /* VRH Set, Vap=4.4+... */
-    {0xC3, {0x11}, 1},
-    /* VDV Set, VDV=0 */
-    {0xC4, {0x20}, 1},
-    /* Frame Rate Control, 60Hz, inversion=0 */
-    {0xC6, {0x0f}, 1},
-    /* Power Control 1, AVDD=6.8V, AVCL=-4.8V, VDDS=2.3V */
-    {0xD0, {0xA4, 0xA1}, 1},
-    /* Positive Voltage Gamma Control */
-    {0xE0, {0xD0, 0x00, 0x05, 0x0E, 0x15, 0x0D, 0x37, 0x43, 0x47, 0x09, 0x15, 0x12, 0x16, 0x19}, 14},
-    /* Negative Voltage Gamma Control */
-    {0xE1, {0xD0, 0x00, 0x05, 0x0D, 0x0C, 0x06, 0x2D, 0x44, 0x40, 0x0E, 0x1C, 0x18, 0x16, 0x19}, 14},
-    /* Invert display */
-    {0x21, {0}, 0x80},
-    /* Sleep Out */
-    {0x11, {0}, 0x80},
-    /* Display On */
-    {0x29, {0}, 0x80},
-    {0, {0}, 0xff}
-};
+#define ST7735_PWCTR1  0xC0
+#define ST7735_PWCTR2  0xC1
+#define ST7735_PWCTR3  0xC2
+#define ST7735_PWCTR4  0xC3
+#define ST7735_PWCTR5  0xC4
+#define ST7735_VMCTR1  0xC5
+
+#define ST7735_PWCTR6  0xFC
+
+#define ST7735_GMCTRP1 0xE0
+#define ST7735_GMCTRN1 0xE1
+
+#define ST_CMD_DELAY   0x80	   // special signifier for command lists
+
+#define ST77XX_NOP	   0x00
+#define ST77XX_SWRESET 0x01
+#define ST77XX_RDDID   0x04
+#define ST77XX_RDDST   0x09
+
+#define ST77XX_SLPIN   0x10
+#define ST77XX_SLPOUT  0x11
+#define ST77XX_PTLON   0x12
+#define ST77XX_NORON   0x13
+
+#define ST77XX_INVOFF  0x20
+#define ST77XX_INVON   0x21
+#define ST77XX_DISPOFF 0x28
+#define ST77XX_DISPON  0x29
+#define ST77XX_CASET   0x2A
+#define ST77XX_RASET   0x2B
+#define ST77XX_RAMWR   0x2C
+#define ST77XX_RAMRD   0x2E
+
+#define ST77XX_PTLAR   0x30
+#define ST77XX_COLMOD  0x3A
+#define ST77XX_MADCTL  0x36
+
+#define ST77XX_MADCTL_MY  0x80
+#define ST77XX_MADCTL_MX  0x40
+#define ST77XX_MADCTL_MV  0x20
+#define ST77XX_MADCTL_ML  0x10
+#define ST77XX_MADCTL_RGB 0x00
+
+#define ST77XX_RDID1   0xDA
+#define ST77XX_RDID2   0xDB
+#define ST77XX_RDID3   0xDC
+#define ST77XX_RDID4   0xDD
+
+
+static const uint8_t
+  Bcmd[] = {				  // Initialization commands for 7735B screens
+	18,						  // 18 commands in list:
+	ST77XX_SWRESET,	  ST_CMD_DELAY,	 //	 1: Software reset, no args, w/delay
+	  50,					  //	 50 ms delay
+	ST77XX_SLPOUT ,	  ST_CMD_DELAY,	 //	 2: Out of sleep mode, no args, w/delay
+	  255,					  //	 255 = 500 ms delay
+	ST77XX_COLMOD , 1+ST_CMD_DELAY,	 //	 3: Set color mode, 1 arg + delay:
+	  0x05,					  //	 16-bit color
+	  10,					  //	 10 ms delay
+	ST7735_FRMCTR1, 3+ST_CMD_DELAY,	 //	 4: Frame rate control, 3 args + delay:
+	  0x00,					  //	 fastest refresh
+	  0x06,					  //	 6 lines front porch
+	  0x03,					  //	 3 lines back porch
+	  10,					  //	 10 ms delay
+	ST77XX_MADCTL , 1	   ,  //  5: Memory access ctrl (directions), 1 arg:
+	  0x08,					  //	 Row addr/col addr, bottom to top refresh
+	ST7735_DISSET5, 2	   ,  //  6: Display settings #5, 2 args, no delay:
+	  0x15,					  //	 1 clk cycle nonoverlap, 2 cycle gate
+							  //	 rise, 3 cycle osc equalize
+	  0x02,					  //	 Fix on VTL
+	ST7735_INVCTR , 1	   ,  //  7: Display inversion control, 1 arg:
+	  0x0,					  //	 Line inversion
+	ST7735_PWCTR1 , 2+ST_CMD_DELAY,	 //	 8: Power control, 2 args + delay:
+	  0x02,					  //	 GVDD = 4.7V
+	  0x70,					  //	 1.0uA
+	  10,					  //	 10 ms delay
+	ST7735_PWCTR2 , 1	   ,  //  9: Power control, 1 arg, no delay:
+	  0x05,					  //	 VGH = 14.7V, VGL = -7.35V
+	ST7735_PWCTR3 , 2	   ,  // 10: Power control, 2 args, no delay:
+	  0x01,					  //	 Opamp current small
+	  0x02,					  //	 Boost frequency
+	ST7735_VMCTR1 , 2+ST_CMD_DELAY,	 // 11: Power control, 2 args + delay:
+	  0x3C,					  //	 VCOMH = 4V
+	  0x38,					  //	 VCOML = -1.1V
+	  10,					  //	 10 ms delay
+	ST7735_PWCTR6 , 2	   ,  // 12: Power control, 2 args, no delay:
+	  0x11, 0x15,
+	ST7735_GMCTRP1,16	   ,  // 13: Magical unicorn dust, 16 args, no delay:
+	  0x09, 0x16, 0x09, 0x20, //	 (seriously though, not sure what
+	  0x21, 0x1B, 0x13, 0x19, //	  these config values represent)
+	  0x17, 0x15, 0x1E, 0x2B,
+	  0x04, 0x05, 0x02, 0x0E,
+	ST7735_GMCTRN1,16+ST_CMD_DELAY,	 // 14: Sparkles and rainbows, 16 args + delay:
+	  0x0B, 0x14, 0x08, 0x1E, //	 (ditto)
+	  0x22, 0x1D, 0x18, 0x1E,
+	  0x1B, 0x1A, 0x24, 0x2B,
+	  0x06, 0x06, 0x02, 0x0F,
+	  10,					  //	 10 ms delay
+	ST77XX_CASET  , 4	   ,  // 15: Column addr set, 4 args, no delay:
+	  0x00, 0x02,			  //	 XSTART = 2
+	  0x00, 0x81,			  //	 XEND = 129
+	ST77XX_RASET  , 4	   ,  // 16: Row addr set, 4 args, no delay:
+	  0x00, 0x02,			  //	 XSTART = 1
+	  0x00, 0x81,			  //	 XEND = 160
+	ST77XX_NORON  ,	  ST_CMD_DELAY,	 // 17: Normal display on, no args, w/delay
+	  10,					  //	 10 ms delay
+	ST77XX_DISPON ,	  ST_CMD_DELAY,	 // 18: Main screen turn on, no args, w/delay
+	  255 },				  //	 255 = 500 ms delay
+
+  Rcmd1[] = {				  // Init for 7735R, part 1 (red or green tab)
+	15,						  // 15 commands in list:
+	ST77XX_SWRESET,	  ST_CMD_DELAY,	 //	 1: Software reset, 0 args, w/delay
+	  150,					  //	 150 ms delay
+	ST77XX_SLPOUT ,	  ST_CMD_DELAY,	 //	 2: Out of sleep mode, 0 args, w/delay
+	  255,					  //	 500 ms delay
+	ST7735_FRMCTR1, 3	   ,  //  3: Frame rate ctrl - normal mode, 3 args:
+	  0x01, 0x2C, 0x2D,		  //	 Rate = fosc/(1x2+40) * (LINE+2C+2D)
+	ST7735_FRMCTR2, 3	   ,  //  4: Frame rate control - idle mode, 3 args:
+	  0x01, 0x2C, 0x2D,		  //	 Rate = fosc/(1x2+40) * (LINE+2C+2D)
+	ST7735_FRMCTR3, 6	   ,  //  5: Frame rate ctrl - partial mode, 6 args:
+	  0x01, 0x2C, 0x2D,		  //	 Dot inversion mode
+	  0x01, 0x2C, 0x2D,		  //	 Line inversion mode
+	ST7735_INVCTR , 1	   ,  //  6: Display inversion ctrl, 1 arg, no delay:
+	  0x07,					  //	 No inversion
+	ST7735_PWCTR1 , 3	   ,  //  7: Power control, 3 args, no delay:
+	  0xA2,
+	  0x02,					  //	 -4.6V
+	  0x84,					  //	 AUTO mode
+	ST7735_PWCTR2 , 1	   ,  //  8: Power control, 1 arg, no delay:
+	  0xC5,					  //	 VGH25 = 2.4C VGSEL = -10 VGH = 3 * AVDD
+	ST7735_PWCTR3 , 2	   ,  //  9: Power control, 2 args, no delay:
+	  0x0A,					  //	 Opamp current small
+	  0x00,					  //	 Boost frequency
+	ST7735_PWCTR4 , 2	   ,  // 10: Power control, 2 args, no delay:
+	  0x8A,					  //	 BCLK/2, Opamp current small & Medium low
+	  0x2A,	 
+	ST7735_PWCTR5 , 2	   ,  // 11: Power control, 2 args, no delay:
+	  0x8A, 0xEE,
+	ST7735_VMCTR1 , 1	   ,  // 12: Power control, 1 arg, no delay:
+	  0x0E,
+	ST77XX_INVON , 0	   ,  // 13: Don't invert display, no args, no delay  (Note: display shows inverted - re-invert?)
+	ST77XX_MADCTL , 1	   ,  // 14: Memory access control (directions), 1 arg:
+	  0xC8,					  //	 row addr/col addr, bottom to top refresh
+	ST77XX_COLMOD , 1	   ,  // 15: set color mode, 1 arg, no delay:
+	  0x05 },				  //	 16-bit color
+  Rcmd2green160x80[] = {			  // Init for 7735R, part 2 (mini 160x80)
+	2,						  //  2 commands in list:
+	ST77XX_CASET  , 4	   ,  //  1: Column addr set, 4 args, no delay:
+	  0x00, 0x00,			  //	 XSTART = 0
+	  0x00, 0x7F,			  //	 XEND = 79
+	ST77XX_RASET  , 4	   ,  //  2: Row addr set, 4 args, no delay:
+	  0x00, 0x00,			  //	 XSTART = 0
+	  0x00, 0x9F },			  //	 XEND = 159
+
+
+  Rcmd3[] = {				  // Init for 7735R, part 3 (red or green tab)
+	4,						  //  4 commands in list:
+	ST7735_GMCTRP1, 16		, //  1: Magical unicorn dust, 16 args, no delay:
+	  0x02, 0x1c, 0x07, 0x12,
+	  0x37, 0x32, 0x29, 0x2d,
+	  0x29, 0x25, 0x2B, 0x39,
+	  0x00, 0x01, 0x03, 0x10,
+	ST7735_GMCTRN1, 16		, //  2: Sparkles and rainbows, 16 args, no delay:
+	  0x03, 0x1d, 0x07, 0x06,
+	  0x2E, 0x2C, 0x29, 0x2D,
+	  0x2E, 0x2E, 0x37, 0x3F,
+	  0x00, 0x00, 0x02, 0x10,
+	ST77XX_NORON  ,	   ST_CMD_DELAY, //	 3: Normal display on, no args, w/delay
+	  10,					  //	 10 ms delay
+	ST77XX_DISPON ,	   ST_CMD_DELAY, //	 4: Main screen turn on, no args w/delay
+	  100 };				  //	 100 ms delay
 
 
 /* Send a command to the LCD. Uses spi_device_polling_transmit, which waits
@@ -108,10 +238,28 @@ void lcd_spi_pre_transfer_callback(spi_transaction_t *t) {
 	gpio_set_level(PIN_NUM_DC, dc);
 }
 
+static void send_cmd_list(spi_device_handle_t spi, const uint8_t *cmd) {
+	int no_cmd=*cmd++;
+	uint8_t buf[32];
+	for (int cmdno=0; cmdno<no_cmd; cmdno++) {
+		int mycmd=*cmd++;
+		lcd_cmd(spi, mycmd);
+		int flag=*cmd++;
+		printf("Cmd %x delay param %x\n", mycmd, flag);
+		if (flag&31) {
+			memcpy(buf, cmd, flag&31);
+			cmd+=(flag&31);
+			lcd_data(spi,buf, (flag&31));
+		}
+		if (flag&ST_CMD_DELAY) {
+			vTaskDelay(pdMS_TO_TICKS(*cmd++));
+		}
+	}
+}
+
+
 //Initialize the display
 void lcd_init_controller(spi_device_handle_t spi) {
-	int cmd=0;
-	const lcd_init_cmd_t* lcd_init_cmds=init_cmds;
 
 	//Initialize non-SPI GPIOs
 	gpio_config_t cfg = {
@@ -125,22 +273,17 @@ void lcd_init_controller(spi_device_handle_t spi) {
 
 	//Reset the display
 	gpio_set_level(PIN_NUM_RST, 0);
-	vTaskDelay(100 / portTICK_RATE_MS);
+	vTaskDelay(pdMS_TO_TICKS(100));
 	gpio_set_level(PIN_NUM_RST, 1);
-	vTaskDelay(100 / portTICK_RATE_MS);
+	vTaskDelay(pdMS_TO_TICKS(100));
 
-	//Send all the commands
-	while (lcd_init_cmds[cmd].databytes!=0xff) {
-		lcd_cmd(spi, lcd_init_cmds[cmd].cmd);
-		lcd_data(spi, lcd_init_cmds[cmd].data, lcd_init_cmds[cmd].databytes&0x1F);
-		if (lcd_init_cmds[cmd].databytes&0x80) {
-			vTaskDelay(100 / portTICK_RATE_MS);
-		}
-		cmd++;
-	}
+	send_cmd_list(spi, Bcmd);
+	send_cmd_list(spi, Rcmd1);
+	send_cmd_list(spi, Rcmd2green160x80);
+	send_cmd_list(spi, Rcmd3);
 
 	///Enable backlight
-	gpio_set_level(PIN_NUM_BCKL, 0);	//For some screens, you may need to set 1 to light its backlight
+	gpio_set_level(PIN_NUM_BCKL, 1);	//For some screens, you may need to set 1 to light its backlight
 }
 
 
@@ -166,19 +309,22 @@ static void send_lines(spi_device_handle_t spi, int ypos, uint16_t *linedata) {
 		}
 		trans[x].flags=SPI_TRANS_USE_TXDATA;
 	}
-	trans[0].tx_data[0]=0x2A;			//Column Address Set
-	trans[1].tx_data[0]=0;				//Start Col High
-	trans[1].tx_data[1]=0;				//Start Col Low
-	trans[1].tx_data[2]=(239)>>8;		//End Col High
-	trans[1].tx_data[3]=(239)&0xff;		//End Col Low
-	trans[2].tx_data[0]=0x2B;			//Page address set
+	int ox=26;
+	int oy=1;
+	ypos+=oy;
+	trans[0].tx_data[0]=ST77XX_CASET;			//Column Address Set
+	trans[1].tx_data[0]=ox;				//Start Col High
+	trans[1].tx_data[1]=ox;				//Start Col Low
+	trans[1].tx_data[2]=(79+ox)>>8;		//End Col High
+	trans[1].tx_data[3]=(79+ox)&0xff;		//End Col Low
+	trans[2].tx_data[0]=ST77XX_RASET;			//Page address set
 	trans[3].tx_data[0]=ypos>>8;		//Start page high
 	trans[3].tx_data[1]=ypos&0xff;		//start page low
 	trans[3].tx_data[2]=(ypos+PARALLEL_LINES)>>8;	 //end page high
 	trans[3].tx_data[3]=(ypos+PARALLEL_LINES)&0xff;	 //end page low
-	trans[4].tx_data[0]=0x2C;			//memory write
+	trans[4].tx_data[0]=ST77XX_RAMWR;			//memory write
 	trans[5].tx_buffer=linedata;		//finally send the line data
-	trans[5].length=240*2*8*PARALLEL_LINES;			 //Data length, in bits
+	trans[5].length=80*2*8*PARALLEL_LINES;			 //Data length, in bits
 	trans[5].flags=0; //undo SPI_TRANS_USE_TXDATA flag
 
 	//Queue all transactions.
@@ -221,19 +367,20 @@ static uint8_t *lcd_get_fb() {
 void lcd_task(void *arg) {
 	spi_device_handle_t spi=(spi_device_handle_t)arg;
 	uint16_t *line_a, *line_b, *line;
-	line_a=calloc(PARALLEL_LINES, 240*2);
-	line_b=calloc(PARALLEL_LINES, 240*2);
+	line_a=calloc(PARALLEL_LINES, 80*2);
+	line_b=calloc(PARALLEL_LINES, 80*2);
 	assert(line_a);
 	assert(line_b);
 	line=line_a;
 
 	//clear entire screen
 	send_lines(spi, 0, line);
-	for (int y=PARALLEL_LINES; y<240; y+=PARALLEL_LINES) {
+	for (int y=PARALLEL_LINES; y<80; y+=PARALLEL_LINES) {
 		send_line_finish(spi);
 		send_lines(spi, y, line);
 	}
 
+	int y_sz=60;
 	while(1) {
 		xSemaphoreTake(sem_start, portMAX_DELAY);
 		uint8_t *fb=lcd_get_fb();
@@ -241,12 +388,20 @@ void lcd_task(void *arg) {
 		for (int yy=0; yy<160; yy+=PARALLEL_LINES) {
 			uint16_t *p=line;
 			for (int y=0; y<PARALLEL_LINES; y++) {
-				for (int x=0; x<240; x++) {
-					*p++=pal[*fb++];
+				int ef_y=((160*(yy+y))/y_sz)-28;
+				uint8_t *fbline=&fb[ef_y*240];
+				if (ef_y>=160 || ef_y<0) {
+					for (int x=0; x<80; x++) *p++=0;
+				} else {
+					for (int x=0; x<80; x++) {
+						*p++=pal[*fbline++];
+						//We scale 240 -> 80, so increase fb by 3
+						fbline+=2;
+					}
 				}
 			}
 			send_line_finish(spi);
-			send_lines(spi, yy+40, line);
+			send_lines(spi, yy, line);
 			if (line==line_a) line=line_b; else line=line_a; //flip
 		}
 		xSemaphoreGive(sem_done);
