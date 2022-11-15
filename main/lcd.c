@@ -356,58 +356,10 @@ static SemaphoreHandle_t sem_start, sem_done;
 static uint16_t lcdpal[256];
 static uint8_t *cur_fb;
 
-static uint16_t *lcd_get_pal() {
-	return lcdpal;
-}
 
-static uint8_t *lcd_get_fb() {
-	return cur_fb;
-}
+static uint16_t *line_a, *line_b, *line;
+static spi_device_handle_t spi;
 
-void lcd_task(void *arg) {
-	spi_device_handle_t spi=(spi_device_handle_t)arg;
-	uint16_t *line_a, *line_b, *line;
-	line_a=calloc(PARALLEL_LINES, 80*2);
-	line_b=calloc(PARALLEL_LINES, 80*2);
-	assert(line_a);
-	assert(line_b);
-	line=line_a;
-
-	//clear entire screen
-	send_lines(spi, 0, line);
-	for (int y=PARALLEL_LINES; y<80; y+=PARALLEL_LINES) {
-		send_line_finish(spi);
-		send_lines(spi, y, line);
-	}
-
-	//This scales the originally 160x240 image to the 80x60 size we need.
-	int y_sz=60;
-	while(1) {
-		xSemaphoreTake(sem_start, portMAX_DELAY);
-		uint8_t *fb=lcd_get_fb();
-		uint16_t *pal=lcd_get_pal();
-		for (int yy=0; yy<160; yy+=PARALLEL_LINES) {
-			uint16_t *p=line;
-			for (int y=0; y<PARALLEL_LINES; y++) {
-				int ef_y=((160*(yy+y))/y_sz)-28;
-				uint8_t *fbline=&fb[ef_y*240];
-				if (ef_y>=160 || ef_y<0) {
-					for (int x=0; x<80; x++) *p++=0;
-				} else {
-					for (int x=0; x<80; x++) {
-						*p++=pal[*fbline++];
-						//We scale 240 -> 80, so increase fb by 3
-						fbline+=2;
-					}
-				}
-			}
-			send_line_finish(spi);
-			send_lines(spi, yy, line);
-			if (line==line_a) line=line_b; else line=line_a; //flip
-		}
-		xSemaphoreGive(sem_done);
-	}
-}
 
 //Take the r8, g8, b8 palette passed in and convert to an uint16_t we can send to the LCD.
 //Store this locally in lcdpal.
@@ -421,18 +373,31 @@ void lcd_set_pal(uint8_t *pal) {
 	}
 }
 
-static int render_requested=0;
 
 void lcd_render_fb(uint8_t *fb) {
-	cur_fb=fb;
-	render_requested=1;
-	xSemaphoreGive(sem_start);
-}
+	line=line_a;
 
-void lcd_render_finish() {
-	if (render_requested) {
-		xSemaphoreTake(sem_done, portMAX_DELAY);
-		render_requested=0;
+	//This scales the originally 160x240 image to the 80x60 size we need.
+	int y_sz=60;
+
+	for (int yy=0; yy<160; yy+=PARALLEL_LINES) {
+		uint16_t *p=line;
+		for (int y=0; y<PARALLEL_LINES; y++) {
+			int ef_y=((160*(yy+y))/y_sz)-28;
+			uint8_t *fbline=&fb[ef_y*240];
+			if (ef_y>=160 || ef_y<0) {
+				for (int x=0; x<80; x++) *p++=0;
+			} else {
+				for (int x=0; x<80; x++) {
+					*p++=lcdpal[*fbline++];
+					//We scale 240 -> 80, so increase fb by 3
+					fbline+=2;
+				}
+			}
+		}
+		send_line_finish(spi);
+		send_lines(spi, yy, line);
+		if (line==line_a) line=line_b; else line=line_a; //flip
 	}
 }
 
@@ -440,7 +405,6 @@ void lcd_render_finish() {
 
 void lcd_init() {
 	esp_err_t ret;
-	spi_device_handle_t spi;
 	spi_bus_config_t buscfg={
 		.miso_io_num=PIN_NUM_MISO,
 		.mosi_io_num=PIN_NUM_MOSI,
@@ -465,11 +429,20 @@ void lcd_init() {
 	//Initialize the LCD
 	lcd_init_controller(spi);
 
-	//create semas
-	sem_start=xSemaphoreCreateBinary();
-	sem_done=xSemaphoreCreateBinary();
-	//Start lcd sending thread
-	xTaskCreate(lcd_task, "lcd", 2*1024, (void*)spi, 5, NULL);
+	//allocate line buffers
+	line_a=calloc(PARALLEL_LINES, 80*2);
+	line_b=calloc(PARALLEL_LINES, 80*2);
+	assert(line_a);
+	assert(line_b);
+
+	//clear entire screen
+	//also leave one transaction in the spi buffer, as the code above assumes there
+	//is one.
+	send_lines(spi, 0, line_a);
+	for (int y=PARALLEL_LINES; y<80; y+=PARALLEL_LINES) {
+		send_line_finish(spi);
+		send_lines(spi, y, line_a);
+	}
 }
 
 

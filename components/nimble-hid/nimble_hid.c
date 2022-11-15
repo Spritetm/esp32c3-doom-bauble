@@ -581,7 +581,7 @@ void nimble_hid_start(hidev_event_cb_t *cb) {
 	ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID; // Enable LTK + IRK
 
 	/* Initialize data structures to track connected peers. */
-	rc = peer_init(MYNEWT_VAL(BLE_MAX_CONNECTIONS), 64, 64, 64);
+	rc = peer_init(MYNEWT_VAL(BLE_MAX_CONNECTIONS), 16, 64, 64);
 	assert(rc == 0);
 
 	/* Set the default device name. */

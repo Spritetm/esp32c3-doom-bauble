@@ -224,7 +224,6 @@ hid_get_item_raw(hid_data_t s, hid_item_t *h)
  top:
 	/* check if there is an array of items */
 	if (s->icount < s->ncount) {
-		printf("Array: %d/%d\n", s->icount, s->ncount);
 		/* get current usage */
 		if (s->iusage < s->nusage) {
 			dval = s->usages_min[s->iusage] + s->ousage;
@@ -250,7 +249,6 @@ hid_get_item_raw(hid_data_t s, hid_item_t *h)
 			h->pos = s->pos[c->kind];
 			h->_usage_page=(h->_usage_page&0xffff0000)|dval;
 			s->pos[c->kind] += c->report_size * c->report_count;
-			printf("a\n");
 			return (1);
 		}
 	}
@@ -314,7 +312,6 @@ hid_get_item_raw(hid_data_t s, hid_item_t *h)
 		case 0:		/* Main */
 			switch (bTag) {
 			case 8:	/* Input */
-				printf("input %lx\n", dval);
 				c->kind = hid_input;
 				c->flags = dval;
 		ret:

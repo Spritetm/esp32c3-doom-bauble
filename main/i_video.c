@@ -82,16 +82,15 @@ void I_StartFrame (void)
 
 }
 
-static uint8_t* backbuffer=NULL;
-static uint8_t* frontbuffer=NULL;
+static uint8_t* fb;
 static uint16_t frontpal[256];
 
 boolean I_StartDisplay(void)
 {
-    _g->screens[0].data = backbuffer;
+    _g->screens[0].data = fb;
 
     // Same with base row offset.
-    drawvars.byte_topleft = backbuffer;
+    drawvars.byte_topleft = fb;
 
     return true;
 }
@@ -106,7 +105,7 @@ void I_EndDisplay(void) {
 	printf("\033[1;1H");
 	for (int y=0; y<SCREENHEIGHT; y+=5) {
 		for (int x=0; x<SCREENWIDTH; x+=1) {
-			unsigned short c=backbuffer[x+y*SCREENWIDTH];
+			unsigned short c=fb[x+y*SCREENWIDTH];
 			int i=((c&31)*5)/32;
 			if (i==0) printf(" ");
 			if (i==1) printf("░");
@@ -117,12 +116,6 @@ void I_EndDisplay(void) {
 		printf("\n");
 	}
 #else
-	//flip front and backbuffer
-	uint8_t *t=backbuffer;
-	backbuffer=frontbuffer;
-	frontbuffer=t;
-
-	lcd_render_finish();
 
 //    if (_g->newpal != NO_PALETTE_CHANGE) {
 		if(!_g->pallete_lump) {
@@ -132,7 +125,7 @@ void I_EndDisplay(void) {
 		lcd_set_pal(_g->current_pallete);
 //		_g->newpal = NO_PALETTE_CHANGE;
 //	}
-	lcd_render_fb(frontbuffer);
+	lcd_render_fb(fb);
 #endif
 }
 
@@ -193,10 +186,8 @@ void I_SetPalette (int pal) {
 
 
 void I_PreInitGraphics(void) {
-	if (backbuffer==NULL) backbuffer = malloc(SCREENHEIGHT*SCREENWIDTH*2);
-	if (frontbuffer==NULL) frontbuffer = malloc(SCREENHEIGHT*SCREENWIDTH*2);
-	assert(backbuffer);
-	assert(frontbuffer);
+	if (fb==NULL) fb = malloc(SCREENHEIGHT*SCREENWIDTH*2);
+	assert(fb);
 	lcd_init();
 }
 

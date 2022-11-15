@@ -118,7 +118,6 @@ hidev_device_t *hidev_device_from_descriptor(uint8_t *descriptor, int descriptor
 		if (dt!=DEVTYPE_NONE) cur_devtype=dt;
 		field_kind_t kind=get_kind_from_page_usage(cur_devtype, HID_PAGE(item._usage_page), HID_USAGE(item._usage_page));
 		if (kind!=FIELD_NONE && item.kind==hid_input && (item.flags&HIO_CONST)==0) {
-			printf("Kind %s no %d id %ld pos %ld size %ld\n", kind_name[kind], kind_ct[kind], item.report_ID, item.pos, item.report_size);
 			dev->field[i].kind=kind;
 			dev->field[i].no=kind_ct[kind];
 			kind_ct[kind]++;
