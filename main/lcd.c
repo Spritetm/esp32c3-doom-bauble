@@ -17,7 +17,7 @@
 #define PIN_NUM_RST	 6
 #define PIN_NUM_BCKL 4
 
-#define PARALLEL_LINES 20
+#define PARALLEL_LINES 4
 
 #define ST7735_MADCTL_BGR 0x08
 #define ST7735_MADCTL_MH  0x04
@@ -380,6 +380,7 @@ void lcd_task(void *arg) {
 		send_lines(spi, y, line);
 	}
 
+	//This scales the originally 160x240 image to the 80x60 size we need.
 	int y_sz=60;
 	while(1) {
 		xSemaphoreTake(sem_start, portMAX_DELAY);

@@ -72,21 +72,12 @@
 
 //*****************************************
 
-//512 bytes.
-static unsigned int columnCacheEntries[128];
 
 //240 bytes.
 short floorclip[MAX_SCREENWIDTH];
 
 //240 bytes.
 short ceilingclip[MAX_SCREENWIDTH];
-
-//*****************************************
-//Column cache stuff.
-//GBA has 16kb of Video Memory for columns
-//*****************************************
-
-static byte columnCache[128*128];
 
 //*****************************************
 //Globals.
@@ -1695,47 +1686,7 @@ static void R_DrawColumnInCache(const column_t* patch, byte* cache, int originy,
  * straight from const patch_t*.
 */
 
-#define CACHE_WAYS 4
-
-#define CACHE_MASK (CACHE_WAYS-1)
-#define CACHE_STRIDE (128 / CACHE_WAYS)
-#define CACHE_KEY_MASK (CACHE_STRIDE-1)
-
-#define CACHE_ENTRY(c, t) ((c << 16 | t))
-
-#define CACHE_HASH(c, t) (((c >> 1) ^ t) & CACHE_KEY_MASK)
-
-static unsigned int FindColumnCacheItem(unsigned int texture, unsigned int column)
-{
-    //static unsigned int looks, peeks;
-    //looks++;
-
-    unsigned int cx = CACHE_ENTRY(column, texture);
-
-    unsigned int key = CACHE_HASH(column, texture);
-
-    unsigned int* cc = (unsigned int*)&columnCacheEntries[key];
-
-    unsigned int i = key;
-
-    do
-    {
-        //peeks++;
-        unsigned int cy = *cc;
-
-        if((cy == cx) || (cy == 0))
-            return i;
-
-        cc+=CACHE_STRIDE;
-        i+=CACHE_STRIDE;
-
-    } while(i < 128);
-
-
-    //No space. Random eviction.
-    return ((M_Random() & CACHE_MASK) * CACHE_STRIDE) + key;
-}
-
+static byte column[128];
 
 static const byte* R_ComposeColumn(const unsigned int texture, const texture_t* tex, int texcolumn, unsigned int iscale)
 {
@@ -1755,53 +1706,43 @@ static const byte* R_ComposeColumn(const unsigned int texture, const texture_t* 
 
     const int xc = (texcolumn & colmask) & tex->widthmask;
 
-    unsigned int cachekey = FindColumnCacheItem(texture, xc);
-
-    byte* colcache = &columnCache[cachekey*128];
-    unsigned int cacheEntry = columnCacheEntries[cachekey];
+    byte* colcache = column;
 
     //total++;
 
-    if(cacheEntry != CACHE_ENTRY(xc, texture))
-    {
         //misses++;
-        byte tmpCache[128];
+	byte tmpCache[128];
 
+	unsigned int i = 0;
+	unsigned int patchcount = tex->patchcount;
 
-        columnCacheEntries[cachekey] = CACHE_ENTRY(xc, texture);
+	do
+	{
+		const texpatch_t* patch = &tex->patches[i];
 
-        unsigned int i = 0;
-        unsigned int patchcount = tex->patchcount;
+		const patch_t* realpatch = patch->patch;
 
-        do
-        {
-            const texpatch_t* patch = &tex->patches[i];
+		const int x1 = patch->originx;
 
-            const patch_t* realpatch = patch->patch;
+		if(xc < x1)
+			continue;
 
-            const int x1 = patch->originx;
+		const int x2 = x1 + realpatch->width;
+		if(xc < x2)
+			{
+			const column_t* patchcol = (const column_t *)((const byte *)realpatch + realpatch->columnofs[xc-x1]);
 
-            if(xc < x1)
-                continue;
+			R_DrawColumnInCache (patchcol,
+									 tmpCache,
+									 patch->originy,
+									 tex->height);
 
-            const int x2 = x1 + realpatch->width;
+		}
 
-            if(xc < x2)
-            {
-                const column_t* patchcol = (const column_t *)((const byte *)realpatch + realpatch->columnofs[xc-x1]);
+	} while(++i < patchcount);
 
-                R_DrawColumnInCache (patchcol,
-                                     tmpCache,
-                                     patch->originy,
-                                     tex->height);
-
-            }
-
-        } while(++i < patchcount);
-
-        //Block copy will drop low 2 bits of len.
-        BlockCopy(colcache, tmpCache, (tex->height + 3));
-    }
+	//Block copy will drop low 2 bits of len.
+	BlockCopy(colcache, tmpCache, (tex->height + 3));
 
     return colcache;
 }
