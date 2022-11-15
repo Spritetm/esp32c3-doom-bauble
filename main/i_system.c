@@ -91,6 +91,9 @@ void I_Error (const char *error, ...)
 static int old_btn;
 
 //KEYD_LEFT, KEYD_DOWN, KEYD_RIGHT, KEYD_UP, KEYD_A, KEYD_B, L, R, START, SELECT
+static int old_axis[2];
+
+#define LIM 10000
 
 void I_ProcessKeyEvents() {
 	hid_ev_t hev;
@@ -99,10 +102,25 @@ void I_ProcessKeyEvents() {
 		if (hev.type==HIDEV_EVENT_KEY_DOWN || hev.type==HIDEV_EVENT_KEY_UP) {
 			//todo: keyboard
 		} else if (hev.type==HIDEV_EVENT_JOY_AXIS && hev.no<2) {
-			ev.type=(hev.joyaxis.pos>10000 || hev.joyaxis.pos<-10000)?ev_keydown:ev_keyup;
-			if (hev.no==0) ev.data1=(hev.joyaxis.pos>0)?KEYD_RIGHT:KEYD_LEFT;
-			if (hev.no==1) ev.data1=(hev.joyaxis.pos>0)?KEYD_DOWN:KEYD_UP;
-			D_PostEvent(&ev);
+			ev.data1=hev.no?KEYD_DOWN:KEYD_RIGHT;
+			if (hev.joyaxis.pos>LIM && old_axis[hev.no]<=LIM) {
+				ev.type=ev_keydown;
+				D_PostEvent(&ev);
+			} else if (hev.joyaxis.pos<=LIM && old_axis[hev.no]>LIM) {
+				ev.type=ev_keyup;
+				D_PostEvent(&ev);
+			}
+
+			ev.data1=hev.no?KEYD_UP:KEYD_LEFT;
+			if (hev.joyaxis.pos<-LIM && old_axis[hev.no]>=-LIM) {
+				ev.type=ev_keydown;
+				D_PostEvent(&ev);
+			} else if (hev.joyaxis.pos>=-LIM && old_axis[hev.no]<-LIM) {
+				ev.type=ev_keyup;
+				D_PostEvent(&ev);
+			}
+
+			old_axis[hev.no]=hev.joyaxis.pos;
 		} else if (hev.type==HIDEV_EVENT_JOY_BUTTONDOWN || hev.type==HIDEV_EVENT_JOY_BUTTONUP) {
 			const int btns[]={KEYD_A, KEYD_B, KEYD_A, KEYD_B, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START};
 			if (hev.no<8) {

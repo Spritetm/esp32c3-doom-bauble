@@ -9,95 +9,56 @@
 #include <stdint.h>
 #include "assert.h"
 #include "snd_c3.h"
-#include "driver/sigmadelta.h"
-#include "driver/timer.h"
+#include "driver/i2s_pdm.h"
+#include "soc/gpio_sig_map.h"
 #include "esp_log.h"
 
 const char *TAG="sndc3";
 
-#define RATE(x) (40000000/x)
-
 #define BUFSZ 128
 
-static QueueHandle_t sampqueue;
-static int8_t *pbuf;
-static int ppos=BUFSZ; //start grabbing next buf
-
-void timercb(void *arg) {
-	if (ppos==BUFSZ) {
-		if (xQueueReceiveFromISR(sampqueue, &pbuf, NULL)) {
-			ppos=0;
-		} else {
-			//underrun
-			sigmadelta_set_duty(0, 0);
-			sigmadelta_set_duty(1, 0);
-			return;
-		}
-	}
-	sigmadelta_set_duty(0, pbuf[ppos]);
-	sigmadelta_set_duty(1, -pbuf[ppos]);
-	ppos++;
-}
-
-static int rate;
 static snd_cb_t *snd_cb;
+i2s_chan_handle_t i2s_handle;
 
 void snd_task(void *arg) {
-	int8_t *buf_a=calloc(BUFSZ, 1);
-	int8_t *buf_b=calloc(BUFSZ, 1);
-	assert(buf_a);
-	assert(buf_b);
+	int16_t buf[BUFSZ];
 	while(1) {
-		snd_cb(buf_a, BUFSZ);
-//		xQueueSend(sampqueue, &buf_a, portMAX_DELAY);
-		snd_cb(buf_b, BUFSZ);
-//		xQueueSend(sampqueue, &buf_b, portMAX_DELAY);
+		snd_cb(buf, BUFSZ);
+		size_t written=0;
+		ESP_ERROR_CHECK(i2s_channel_write(i2s_handle, buf, BUFSZ*2, &written, 1000));
 	}
 }
 
 void snd_init(int samprate, snd_cb_t *cb) {
-	return;
-	rate=samprate;
 	snd_cb=cb;
-	sampqueue=xQueueCreate(1, sizeof(uint8_t*));
 
-	//Set up 2 sigma-delta converters, one for each GPIO
-	sigmadelta_config_t sdconfig={
-		.channel=SIGMADELTA_CHANNEL_0,
-		.sigmadelta_duty=0,
-		.sigmadelta_prescale=10,
-		.sigmadelta_gpio=0,
+	i2s_chan_config_t i2s_config={
+		.id=0,
+		.role=I2S_ROLE_MASTER,
+		.dma_desc_num=2,
+		.dma_frame_num=128,
+		.auto_clear=true
 	};
-	ESP_ERROR_CHECK(sigmadelta_config(&sdconfig));
-	sdconfig.sigmadelta_gpio=1;
-	sdconfig.channel=SIGMADELTA_CHANNEL_1;
-	ESP_ERROR_CHECK(sigmadelta_config(&sdconfig));
-
-	//Set up timer for sample rate
-	int group=0;
-	int timer=0;
-	/* Select and initialize basic parameters of the timer */
-	timer_config_t config = {
-		.divider = 2,
-		.counter_dir = TIMER_COUNT_UP,
-		.counter_en = TIMER_PAUSE,
-		.alarm_en = TIMER_ALARM_EN,
-		.auto_reload = true,
-	}; // default clock source is APB
-	timer_init(group, timer, &config);
-
-	/* Timer's counter will initially start from value below.
-	   Also, if auto_reload is set, this value will be automatically reload on alarm */
-	timer_set_counter_value(group, timer, 0);
-
-	/* Configure the alarm value and the interrupt on alarm. */
-	timer_set_alarm_value(group, timer, RATE(samprate));
-	timer_enable_intr(group, timer);
-	timer_isr_callback_add(group, timer, timercb, NULL, 0);
-
-	timer_start(group, timer);
+	ESP_ERROR_CHECK(i2s_new_channel(&i2s_config, &i2s_handle, NULL));
+	
+	i2s_pdm_tx_config_t i2s_pdm_config={
+		.clk_cfg=I2S_PDM_TX_CLK_DEFAULT_CONFIG(samprate),
+		.slot_cfg=I2S_PDM_TX_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
+		.gpio_cfg={
+			.clk=GPIO_NUM_NC,
+			.dout=0,
+		}
+	};
+	
+	ESP_ERROR_CHECK(i2s_channel_init_pdm_tx_mode(i2s_handle, &i2s_pdm_config));
+	i2s_channel_enable(i2s_handle);
 
 	//Start task to handle sound stuff
-	xTaskCreate(snd_task, "snd", 4*1024, NULL, 5, NULL);
+	xTaskCreate(snd_task, "snd", 2*1024, NULL, 5, NULL);
+
+	vTaskDelay(pdMS_TO_TICKS(200));
+
+	//GPIO1 is the inverse of GPIO0
+	esp_rom_gpio_connect_out_signal(1, I2SO_SD_OUT_IDX, 1, 0);
 }
 

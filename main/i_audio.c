@@ -65,7 +65,7 @@
 
 #include "dbopl.h"
 
-#define RATE (11025*2)
+#define RATE (11025)
 
 typedef int32_t fixed_pt_t; //24.8 fixed point format
 #define TO_FIXED(x) ((x)<<8)
@@ -117,7 +117,7 @@ static void imf_player_tick(int samps) {
 }
 
 
-static void snd_cb(int8_t *buf, int len) {
+static void snd_cb(int16_t *buf, int len) {
 	static int32_t *oplblk=NULL;
 	if (!oplblk) {
 		oplblk=calloc(len, sizeof(int32_t));
@@ -126,10 +126,11 @@ static void snd_cb(int8_t *buf, int len) {
 	imf_player_tick(len);
 	Chip__GenerateBlock2(&imfplayer.opl, len, oplblk);
 	for (int p=0; p<len; p++) {
-		int samp=oplblk[p]/64;
+		int samp=oplblk[p]*4; //mix in music
 		for (int i=0; i<NO_SLOT; i++) {
 			if (slot[i].samp) {
-				samp+=slot[i].samp[FROM_FIXED(slot[i].pos)];
+				//mix in sound fx slot
+				samp+=(slot[i].samp[FROM_FIXED(slot[i].pos)])*128;
 				//increase, unload if end
 				slot[i].pos+=slot[i].rate_inc;
 				if (slot[i].pos > slot[i].len) {
@@ -141,8 +142,8 @@ static void snd_cb(int8_t *buf, int len) {
 #if 0
 		samp=samp/NO_SLOT;
 #else
-		if (samp>127) samp=127;
-		if (samp<-128) samp=-128;
+		if (samp<-32768) samp=32768;
+		if (samp>32767) samp=32767;
 #endif
 		buf[p]=samp;
 	}
