@@ -41,7 +41,6 @@
 #include "p_tick.h"
 
 #include "global_data.h"
-#include "esp_heap_caps.h"
 
 
 //////////////////////////////////////////////////////////
@@ -282,25 +281,19 @@ void P_SpawnStrobeFlash
 void P_SpawnGlowingLight(sector_t*  sector)
 {
   glow_t* g;
-	heap_caps_check_integrity_all(1);
 
   g = Z_Malloc( sizeof(*g), PU_LEVSPEC, 0);
 
-	heap_caps_check_integrity_all(1);
   memset(g, 0, sizeof(*g));
-	heap_caps_check_integrity_all(1);
   P_AddThinker(&g->thinker);
-	heap_caps_check_integrity_all(1);
 
   g->sector = sector;
   g->minlight = P_FindMinSurroundingLight(sector,sector->lightlevel);
   g->maxlight = sector->lightlevel;
   g->thinker.function = T_Glow;
   g->direction = -1;
-	heap_caps_check_integrity_all(1);
 
   sector->special &= ~31; //jff 3/14/98 clear non-generalized sector type
-	heap_caps_check_integrity_all(1);
 }
 
 //////////////////////////////////////////////////////////

@@ -2310,8 +2310,6 @@ void P_UpdateSpecials (void)
 //  scan for specials that spawn thinkers
 //
 
-#include "esp_heap_caps.h"
-
 // Parses command line parameters.
 void P_SpawnSpecials (void)
 {
@@ -2327,7 +2325,6 @@ void P_SpawnSpecials (void)
   sector = _g->sectors;
   for (i=0 ; i<_g->numsectors ; i++, sector++)
   {
-	heap_caps_check_integrity_all(1);
 
     if (!sector->special)
       continue;

@@ -67,8 +67,6 @@
 
 #include "gba_functions.h"
 
-#include "esp_heap_caps.h"
-
 
 //*****************************************
 
@@ -2795,13 +2793,12 @@ void V_DrawPatchNoScale(int x, int y, const patch_t* patch)
 
         unsigned int odd_addr = (unsigned int)desttop & 1;
 
-        byte* desttop_even = (byte*)((unsigned int)desttop & 0xfffffffe);
 
         // step through the posts in a column
         while (column->topdelta != 0xff)
         {
             const byte* source = (const byte*)column + 3;
-            byte* dest = desttop_even + ((column->topdelta*SCREENWIDTH) << 1);
+            byte* dest = desttop + ((column->topdelta*SCREENWIDTH) << 1);
 
             unsigned int count = column->length;
 
@@ -2809,15 +2806,8 @@ void V_DrawPatchNoScale(int x, int y, const patch_t* patch)
             while (count--)
             {
                 unsigned int color = *source++;
-                unsigned short* dest16 = (unsigned short*)dest;
 
-                unsigned int old = *dest16;
-
-                //The GBA must write in 16bits.
-                if(odd_addr)
-                    *dest16 = (old & 0xff) | (color << 8);
-                else
-                    *dest16 = ((color & 0xff) | (old & 0xff00));
+				dest=color;
 
                 dest += 240;
             }

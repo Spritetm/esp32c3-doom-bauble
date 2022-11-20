@@ -75,7 +75,6 @@
 #include "global_data.h"
 
 #include "gba_functions.h"
-#include "esp_heap_caps.h"
 
 //
 // controls (have defaults)

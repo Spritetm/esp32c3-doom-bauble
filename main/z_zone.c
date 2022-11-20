@@ -54,7 +54,6 @@
 #include "v_video.h"
 #include "g_game.h"
 #include "lprintf.h"
-#include "esp_heap_caps.h"
 
 // Tunables
 
@@ -159,7 +158,6 @@ void *Z_Malloc_verbose(size_t size, int tag, void **user, const char *function, 
     block = NULL;
   }
 
-	heap_caps_check_integrity_all(1);
   while (!(block = (malloc)(size + HEADER_SIZE))) {
 
     if (!blockbytag[PU_CACHE])
@@ -168,7 +166,6 @@ void *Z_Malloc_verbose(size_t size, int tag, void **user, const char *function, 
       );
     Z_FreeTags(PU_CACHE,PU_CACHE);
   }
-	heap_caps_check_integrity_all(1);
 
   if (!blockbytag[tag])
   {

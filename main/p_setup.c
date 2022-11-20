@@ -49,7 +49,6 @@
 #include "s_sound.h"
 #include "lprintf.h" //jff 10/6/98 for debug outputs
 #include "v_video.h"
-#include "esp_heap_caps.h"
 
 #include "global_data.h"
 
@@ -550,10 +549,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
   // set up world state
   P_SpawnSpecials();
-	heap_caps_check_integrity_all(1);
 
   P_MapEnd();
-	heap_caps_check_integrity_all(1);
 
 }
 

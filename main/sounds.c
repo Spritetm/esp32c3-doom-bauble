@@ -40,7 +40,7 @@
 
 #include "doomtype.h"
 #include "sounds.h"
-
+#include <stddef.h>
 
 #define MUSIC(name) \
     { name }
