@@ -171,6 +171,8 @@ int wipe_tick;
 
 const byte *demobuffer;   /* cph - only used for playback */
 int demolength; // check for overrun (missing DEMOMARKER)
+FILE * demofp;
+int demorecording;
 
 const byte *demo_p;
 

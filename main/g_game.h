@@ -71,6 +71,8 @@ void G_RestartLevel(void); // CPhipps - menu involked level restart
 void G_DoVictory(void);
 void G_BuildTiccmd (ticcmd_t* cmd); // CPhipps - move decl to header
 void G_MakeSpecialEvent(buttoncode_t bc, ...); /* cph - new event stuff */
+void G_RecordDemo (const char* name);
+void G_BeginRecording (void);
 
 void G_UpdateSaveGameStrings();
 

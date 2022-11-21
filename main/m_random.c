@@ -73,8 +73,15 @@ static const unsigned char rndtable[256] = {
 
 
 // Which one is deterministic?
-int P_Random (void)
-{
+#ifdef INSTRUMENTED
+int P_Random_x (const char *file, int line) {
+#else
+int P_Random () {
+#endif
+
+#ifdef INSTRUMENTED
+	lprintf(LO_INFO, "%.10d: random: %s:%d", _g->gametic, file, line);
+#endif
     _g->prndindex = (_g->prndindex+1)&0xff;
     return rndtable[_g->prndindex];
 }

@@ -88,7 +88,7 @@ static void PrintVer(void)
     lprintf(LO_INFO,"%s",I_GetVersionString(vbuf,200));
 }
 
-void main() {
+void main(int argc, char *argv) {
 	doom_iwad=calloc(8*1024*1024, 1);
 	FILE *f=fopen("../../doom1gba.wad", "r");
 	if (!f) {

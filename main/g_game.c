@@ -75,6 +75,7 @@
 #include "global_data.h"
 
 #include "gba_functions.h"
+#include <unistd.h>
 
 //
 // controls (have defaults)
@@ -119,7 +120,7 @@ static const fixed_t angleturn[3]	= {640, 1280, 320};	 // + slow turn
 
 static void G_DoSaveGame (boolean menu);
 static const byte* G_ReadDemoHeader(const byte* demo_p, size_t size, boolean failonerror);
-
+void G_WriteDemoTiccmd (ticcmd_t* cmd);
 
 typedef struct gba_save_data_t
 {
@@ -532,6 +533,8 @@ boolean G_Responder (event_t* ev)
 
 			  if (_g->demoplayback)
 				  G_ReadDemoTiccmd (cmd);
+          if (_g->demorecording)
+		            G_WriteDemoTiccmd (cmd);
 		  }
 
 
@@ -1191,26 +1194,89 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
 {
   unsigned char at; // e6y: tasdoom stuff
 
-  if (*_g->demo_p == DEMOMARKER)
-	G_CheckDemoStatus();	  // end of demo data stream
-  else if (_g->demoplayback && _g->demo_p + (_g->longtics?5:4) > _g->demobuffer + _g->demolength)
-  {
-	lprintf(LO_WARN, "G_ReadDemoTiccmd: missing DEMOMARKER\n");
-	G_CheckDemoStatus();
-  }
-  else
-	{
-	  cmd->forwardmove = ((signed char)*_g->demo_p++);
-	  cmd->sidemove = ((signed char)*_g->demo_p++);
-	  if (!_g->longtics) {
-		cmd->angleturn = ((unsigned char)(at = *_g->demo_p++))<<8;
-	  } else {
-	unsigned int lowbyte = (unsigned char)*_g->demo_p++;
-		cmd->angleturn = (((signed int)(*_g->demo_p++))<<8) + lowbyte;
-	  }
-	  cmd->buttons = (unsigned char)*_g->demo_p++;
+	if (*_g->demo_p == DEMOMARKER) {
+		G_CheckDemoStatus();	  // end of demo data stream
+	} else if (_g->demoplayback && _g->demo_p + (_g->longtics?5:4) > _g->demobuffer + _g->demolength) {
+		lprintf(LO_WARN, "G_ReadDemoTiccmd: missing DEMOMARKER\n");
+		G_CheckDemoStatus();
+	} else {
+		cmd->forwardmove = ((signed char)*_g->demo_p++);
+		cmd->sidemove = ((signed char)*_g->demo_p++);
+		if (!_g->longtics) {
+			cmd->angleturn = ((unsigned char)(at = *_g->demo_p++))<<8;
+		} else {
+			unsigned int lowbyte = (unsigned char)*_g->demo_p++;
+			cmd->angleturn = (((signed int)(*_g->demo_p++))<<8) + lowbyte;
+		}
+		cmd->buttons = (unsigned char)*_g->demo_p++;
+//		printf("Demo tic: %02X %02X %02X %02X\n", cmd->forwardmove, cmd->sidemove, cmd->angleturn, cmd->buttons);
 	}
 }
+
+/* Demo limits removed -- killough
+ * cph - record straight to file
+ */
+void G_WriteDemoTiccmd (ticcmd_t* cmd)
+{
+  char buf[5];
+  char *p = buf;
+
+  *p++ = cmd->forwardmove;
+  *p++ = cmd->sidemove;
+  if (!_g->longtics) {
+    *p++ = (cmd->angleturn+128)>>8;
+  } else {
+    signed short a = cmd->angleturn;
+    *p++ = a & 0xff;
+    *p++ = (a >> 8) & 0xff;
+  }
+  *p++ = cmd->buttons;
+  if (fwrite(buf, p-buf, 1, _g->demofp) != 1)
+    I_Error("G_WriteDemoTiccmd: error writing demo");
+
+  /* cph - alias demo_p to it so we can read it back */
+  _g->demo_p = buf;
+  G_ReadDemoTiccmd (cmd);         // make SURE it is exactly the same
+}
+
+//
+// G_RecordDemo
+//
+
+void G_RecordDemo (const char* name)
+{
+  char     demoname[PATH_MAX];
+  _g->usergame = false;
+	strcpy(demoname, name);
+  _g->demorecording = true;
+  /* cph - Record demos straight to file
+   * If file already exists, try to continue existing demo
+   */
+  _g->demofp = fopen(demoname, "wb");
+  if (!_g->demofp) I_Error("G_RecordDemo: failed to open %s", name);
+}
+
+// These functions are used to read and write game-specific options in demos
+// and savegames so that demo sync is preserved and savegame restoration is
+// complete. Not all options (for example "compatibility"), however, should
+// be loaded and saved here. It is extremely important to use the same
+// positions as before for the variables, so if one becomes obsolete, the
+// byte(s) should still be skipped over or padded with 0's.
+// Lee Killough 3/1/98
+
+byte *G_WriteOptions(byte *demo_p)
+{
+  byte *target = demo_p + GAME_OPTION_SIZE;
+
+  while (demo_p < target)
+    *demo_p++ = 0;
+
+  if (demo_p != target)
+    I_Error("G_WriteOptions: GAME_OPTION_SIZE is too small");
+
+  return target;
+}
+
 
 
 /* Same, but read instead of write
@@ -1223,6 +1289,35 @@ const byte *G_ReadOptions(const byte *demo_p)
 
   return target;
 }
+
+
+void G_BeginRecording (void)
+{
+  int i;
+  byte *demostart, *demo_p;
+  demostart = demo_p = malloc(1000);
+
+	if (_g->longtics) {
+		printf("demo with longtics unsupported\n");
+		exit(1);
+	}
+
+    *demo_p++ = 109; // v1.9 has best chance of syncing these
+    *demo_p++ = _g->gameskill;
+    *demo_p++ = _g->gameepisode;
+    *demo_p++ = _g->gamemap;
+    *demo_p++ = 0; //mp
+    *demo_p++ = 0; //respawn
+    *demo_p++ = 0; //fast
+    *demo_p++ = 0; //nomonsters
+    *demo_p++ = 0; //player pov
+    for (i=0; i<4; i++) *demo_p++ = (i==0)?1:0;
+
+  if (fwrite(demostart, 1, demo_p-demostart, _g->demofp) != (size_t)(demo_p-demostart))
+    I_Error("G_BeginRecording: Error writing demo header");
+  free(demostart);
+}
+
 
 //
 // G_PlayDemo
@@ -1280,127 +1375,124 @@ static const byte* G_ReadDemoHeader(const byte *demo_p, size_t size, boolean fai
   // Versions up to 1.2 use a 7-byte header - first byte is a skill level.
   // Versions after 1.2 use a 13-byte header - first byte is a demoversion.
   // BOOM's demoversion starts from 200
-  if (!((_g->demover >=	  0	 && _g->demover <=	 4) ||
+	if (!((_g->demover >=	  0	 && _g->demover <=	 4) ||
 		(_g->demover >= 104	 && _g->demover <= 111) ||
-		(_g->demover >= 200	 && _g->demover <= 214)))
-  {
-	I_Error("G_ReadDemoHeader: Unknown demo format %d.", _g->demover);
-  }
+		(_g->demover >= 200	 && _g->demover <= 214))) {
+		I_Error("G_ReadDemoHeader: Unknown demo format %d.", _g->demover);
+	}
 
-  if (_g->demover < 200)	 // Autodetect old demos
-	{
-	  if (_g->demover >= 111) _g->longtics = 1;
+	if (_g->demover < 200) {	 // Autodetect old demos
+		if (_g->demover >= 111) _g->longtics = 1;
 
-	  // killough 3/2/98: force these variables to be 0 in demo_compatibility
+		// killough 3/2/98: force these variables to be 0 in demo_compatibility
 
-	  // killough 3/6/98: rearrange to fix savegame bugs (moved fastparm,
-	  // respawnparm, nomonsters flags to G_LoadOptions()/G_SaveOptions())
+		// killough 3/6/98: rearrange to fix savegame bugs (moved fastparm,
+		// respawnparm, nomonsters flags to G_LoadOptions()/G_SaveOptions())
 
-	  if ((skill=_g->demover) >= 100)		  // For demos from versions >= 1.4
-		{
-		  //e6y: check for overrun
-		  if (CheckForOverrun(header_p, demo_p, size, 8, failonerror))
+		if ((skill=_g->demover) >= 100)		  // For demos from versions >= 1.4
+			{
+			//e6y: check for overrun
+			if (CheckForOverrun(header_p, demo_p, size, 8, failonerror))
+				return NULL;
+
+			skill = *demo_p++;
+			episode = *demo_p++;
+			map = *demo_p++;
+			demo_p++;
+			demo_p++;
+			demo_p++;
+			demo_p++;
+			demo_p++;
+		} else {
+			//e6y: check for overrun
+			if (CheckForOverrun(header_p, demo_p, size, 2, failonerror))
+				return NULL;
+
+			episode = *demo_p++;
+			map = *demo_p++;
+		}
+	} else	{  // new versions of demos
+		demo_p += 6;				 // skip signature;
+		switch (_g->demover) {
+		case 200: /* BOOM */
+		case 201:
+			//e6y: check for overrun
+			if (CheckForOverrun(header_p, demo_p, size, 1, failonerror))
+			  return NULL;
+	  		break;
+		case 202:
+			//e6y: check for overrun
+			if (CheckForOverrun(header_p, demo_p, size, 1, failonerror))
+				return NULL;
+			break;
+	  	case 203:
+			/* LxDoom or MBF - determine from signature
+			 cph - load compatibility level */
+			switch (*(header_p + 2)) {
+			case 'B': /* LxDoom */
+	  			/* cph - DEMOSYNC - LxDoom demos recorded in compatibility modes support dropped */
+	  			break;
+			case 'M':
+				demo_p++;
+				break;
+			}
+			break;
+		case 210:
+			demo_p++;
+			break;
+		case 211:
+			demo_p++;
+			break;
+		case 212:
+			demo_p++;
+			break;
+		case 213:
+			demo_p++;
+			break;
+		case 214:
+			_g->longtics = 1;
+			demo_p++;
+			break;
+		}
+		//e6y: check for overrun
+		if (CheckForOverrun(header_p, demo_p, size, 5, failonerror))
 			return NULL;
 
-		  skill = *demo_p++;
-		  episode = *demo_p++;
-		  map = *demo_p++;
-		  demo_p++;
-		  demo_p++;
-		  demo_p++;
-		  demo_p++;
-		  demo_p++;
-		}
-	  else
-		{
-		  //e6y: check for overrun
-		  if (CheckForOverrun(header_p, demo_p, size, 2, failonerror))
+		skill = *demo_p++;
+		episode = *demo_p++;
+		map = *demo_p++;
+		demo_p++;
+		demo_p++;
+
+		//e6y: check for overrun
+		if (CheckForOverrun(header_p, demo_p, size, GAME_OPTION_SIZE, failonerror))
 			return NULL;
 
-		  episode = *demo_p++;
-		  map = *demo_p++;
-		}
+		demo_p = G_ReadOptions(demo_p);  // killough 3/1/98: Read game options
 
-	}
-  else	  // new versions of demos
-	{
-	  demo_p += 6;				 // skip signature;
-	  switch (_g->demover) {
-	  case 200: /* BOOM */
-	  case 201:
-		//e6y: check for overrun
-		if (CheckForOverrun(header_p, demo_p, size, 1, failonerror))
-		  return NULL;
-	  break;
-	  case 202:
-		//e6y: check for overrun
-		if (CheckForOverrun(header_p, demo_p, size, 1, failonerror))
-		  return NULL;
-
-	  break;
-	  case 203:
-	/* LxDoom or MBF - determine from signature
-	 * cph - load compatibility level */
-	switch (*(header_p + 2)) {
-	case 'B': /* LxDoom */
-	  /* cph - DEMOSYNC - LxDoom demos recorded in compatibility modes support dropped */
-	  break;
-	case 'M':
-	  demo_p++;
-	  break;
-	}
-	break;
-	  case 210:
-	demo_p++;
-	break;
-	  case 211:
-	demo_p++;
-	break;
-	  case 212:
-	demo_p++;
-	break;
-	  case 213:
-	demo_p++;
-	break;
-	  case 214:
-		_g->longtics = 1;
-	demo_p++;
-	break;
-	  }
-	  //e6y: check for overrun
-	  if (CheckForOverrun(header_p, demo_p, size, 5, failonerror))
-		return NULL;
-
-	  skill = *demo_p++;
-	  episode = *demo_p++;
-	  map = *demo_p++;
-	  demo_p++;
-	  demo_p++;
-
-	  //e6y: check for overrun
-	  if (CheckForOverrun(header_p, demo_p, size, GAME_OPTION_SIZE, failonerror))
-		return NULL;
-
-	  demo_p = G_ReadOptions(demo_p);  // killough 3/1/98: Read game options
-
-	  if (_g->demover == 200)			   // killough 6/3/98: partially fix v2.00 demos
-		demo_p += 256-GAME_OPTION_SIZE;
+		if (_g->demover == 200)			   // killough 6/3/98: partially fix v2.00 demos
+			demo_p += 256-GAME_OPTION_SIZE;
 	}
 
-	  //e6y: check for overrun
-	  if (CheckForOverrun(header_p, demo_p, size, MAXPLAYERS, failonerror)) return NULL;
+	//e6y: check for overrun
+	if (CheckForOverrun(header_p, demo_p, size, MAXPLAYERS, failonerror)) return NULL;
 
+
+	if (_g->demover >= 200) {
 		_g->playeringame = *demo_p++;
-	  demo_p += MIN_MAXPLAYERS - MAXPLAYERS;
+		demo_p += MIN_MAXPLAYERS - MAXPLAYERS;
+	}
 
-
-  if (_g->gameaction != ga_loadgame) { /* killough 12/98: support -loadgame */
-	G_InitNew(skill, episode, map);
-  }
+	if (_g->gameaction != ga_loadgame) { /* killough 12/98: support -loadgame */
+		G_InitNew(skill, episode, map);
+	}
 
 	_g->player.cheats = 0;
 
-  return demo_p;
+	demo_p+=4; //skip over players
+
+	printf("Demo hdr size %d\n", demo_p-header_p);
+	return demo_p;
 }
 
 void G_DoPlayDemo(void)
@@ -1432,6 +1524,13 @@ void G_DoPlayDemo(void)
  */
 boolean G_CheckDemoStatus (void)
 {
+  if (_g->demorecording)
+    {
+      _g->demorecording = false;
+      fputc(DEMOMARKER, _g->demofp);
+      I_Error("G_CheckDemoStatus: Demo recorded");
+      return false;  // killough
+    }
   if (_g->timingdemo)
 	{
 	  int endtime = I_GetTime();

@@ -396,7 +396,8 @@ void lcd_render_fb(uint8_t *fb) {
 			}
 		}
 		send_line_finish(spi);
-		send_lines(spi, yy, line);
+//		send_lines(spi, yy, line);
+		send_lines(spi, yy+80, line); //HACK
 		if (line==line_a) line=line_b; else line=line_a; //flip
 	}
 }

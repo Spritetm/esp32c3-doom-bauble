@@ -8,7 +8,7 @@
 SDL_Window *window;
 SDL_Renderer* renderer;
 
-uint8_t palette[256];
+uint8_t palette[256*3];
 
 void lcd_set_pal(uint8_t *pal) {
 	memcpy(palette, pal, 256*3);

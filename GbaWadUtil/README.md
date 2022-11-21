@@ -1,3 +1,11 @@
+NOTE: This has been modified for the ESP32C3 version of Doom.
+
+Changes are that demos are replaced by the files in the 'demo' directory, and the original .mus music is replaced by the .imf equivalent in the 'music' directory.
+
+
+Original README.md:
+
+
 Utility to process Doom IWAD files for GBA Doom.
 
 It can write either a new WAD file and/or a C Source file.

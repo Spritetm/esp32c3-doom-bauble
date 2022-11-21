@@ -52,6 +52,7 @@
 #include "rom/rtc.h"
 #include "esp_timer.h"
 #include "esp_partition.h"
+#include "esp_spi_flash.h"
 
 #include "doomdef.h"
 #include "d_main.h"
@@ -82,7 +83,9 @@
  */
 
 const unsigned char *doom_iwad;
-const unsigned int doom_iwad_len=4972760;
+//This can be larger than the actual size of the iwad (up to what the mmu supports)
+//but never smaller.
+const unsigned int doom_iwad_len=6000000;
 
 void I_Init(void)
 {

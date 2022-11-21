@@ -748,6 +748,12 @@ static void D_DoomMainSetup(void)
 
     I_InitGraphics();
 
+#if 0
+	G_RecordDemo("demo.lmp");
+	G_InitNew(sk_medium, 1, 7);
+	G_BeginRecording();
+	return;
+#endif
     if (timedemo)
     {
         _g->singletics = true;

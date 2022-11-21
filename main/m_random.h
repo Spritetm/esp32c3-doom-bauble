@@ -45,7 +45,16 @@
 int M_Random (void);
 
 // As M_Random, but used only by the play simulation.
+//#define INSTRUMENTED
+
+#ifdef INSTRUMENTED
+#define P_Random() P_Random_x (__FILE__,__LINE__)
+int P_Random_x (const char*, int);
+#else
 int P_Random (void);
+#endif
+
+
 
 // Fix randoms for demos.
 void M_ClearRandom (void);

@@ -15,6 +15,7 @@ bool WadProcessor::ProcessWad()
 
     RemoveUnusedLumps();
 	ReplaceMusic();
+	ReplaceDemos();
 
     int lumpNum = wadFile.GetLumpByName("MAP01", mapLump);
 
@@ -493,6 +494,28 @@ bool WadProcessor::ReplaceMusic() {
     }
 	return true;
 }
+
+bool WadProcessor::ReplaceDemos() {
+    for(quint32 i = 0; i < wadFile.LumpCount(); i++) {
+        Lump l;
+
+        wadFile.GetLumpByNum(i, l);
+
+        if(l.name.startsWith("DEMO")) {
+			Lump newLump;
+			newLump.name = l.name;
+			QFile CurrentFile("demo/"+l.name.toLower()+".lmp");
+			if(CurrentFile.open(QIODevice::ReadOnly)) {
+				QByteArray DataFile = CurrentFile.readAll();
+				newLump.length = DataFile.size();
+				newLump.data = DataFile;
+				wadFile.ReplaceLump(i, newLump);
+			}
+        }
+    }
+	return true;
+}
+
 
 bool WadProcessor::RemoveUnusedLumps()
 {

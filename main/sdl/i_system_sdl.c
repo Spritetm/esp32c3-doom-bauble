@@ -52,6 +52,7 @@
 
 #include "global_data.h"
 
+#include <SDL2/SDL.h>
 
 /* cphipps - I_GetVersionString
  * Returns a version string in the given buffer 
@@ -92,51 +93,28 @@ static int old_btn;
 
 
 void I_ProcessKeyEvents() {
-/*
-	hid_ev_t hev;
+	SDL_Event e;
 	event_t ev;
-	while (input_get_event(&hev)) {
-		if (hev.type==HIDEV_EVENT_KEY_DOWN || hev.type==HIDEV_EVENT_KEY_UP) {
-			//todo: keyboard
-		} else if (hev.type==HIDEV_EVENT_JOY_AXIS && hev.no<2) {
-			ev.data1=hev.no?KEYD_DOWN:KEYD_RIGHT;
-			if (hev.joyaxis.pos>LIM && old_axis[hev.no]<=LIM) {
-				ev.type=ev_keydown;
-				D_PostEvent(&ev);
-			} else if (hev.joyaxis.pos<=LIM && old_axis[hev.no]>LIM) {
-				ev.type=ev_keyup;
-				D_PostEvent(&ev);
-			}
-
-			ev.data1=hev.no?KEYD_UP:KEYD_LEFT;
-			if (hev.joyaxis.pos<-LIM && old_axis[hev.no]>=-LIM) {
-				ev.type=ev_keydown;
-				D_PostEvent(&ev);
-			} else if (hev.joyaxis.pos>=-LIM && old_axis[hev.no]<-LIM) {
-				ev.type=ev_keyup;
-				D_PostEvent(&ev);
-			}
-
-			old_axis[hev.no]=hev.joyaxis.pos;
-		} else if (hev.type==HIDEV_EVENT_JOY_BUTTONDOWN || hev.type==HIDEV_EVENT_JOY_BUTTONUP) {
-			const int btns[]={KEYD_A, KEYD_B, KEYD_A, KEYD_B, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START};
-			if (hev.no<8) {
-				ev.type=(hev.type==HIDEV_EVENT_JOY_BUTTONDOWN)?ev_keydown:ev_keyup;
-				ev.data1=btns[hev.no];
-				D_PostEvent(&ev);
-			}
-		} else if (hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN || hev.type==HIDEV_EVENT_MOUSE_BUTTONUP) {
-			const int btns[]={KEYD_A, KEYD_B, KEYD_START, KEYD_SELECT, KEYD_L, KEYD_R};
-			if (hev.no<6) {
-				ev.type=(hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN)?ev_keydown:ev_keyup;
-				ev.data1=btns[hev.no];
-				D_PostEvent(&ev);
-			}
-		} else if (hev.type==HIDEV_EVENT_MOUSE_MOTION) {
-			//todo: mouse
+	while(SDL_PollEvent(&e)!=0) {
+		if (e.type==SDL_QUIT) {
+			exit(0);
+		} else if (e.type==SDL_KEYDOWN || e.type==SDL_KEYUP) {
+			ev.type=(e.type==SDL_KEYDOWN)?ev_keydown:ev_keyup;
+			ev.data1=-1;
+			if (e.key.keysym.sym==SDLK_ESCAPE && e.type==SDL_KEYDOWN) exit(0);
+			if (e.key.keysym.sym==SDLK_UP) ev.data1=KEYD_UP;
+			if (e.key.keysym.sym==SDLK_DOWN) ev.data1=KEYD_DOWN;
+			if (e.key.keysym.sym==SDLK_LEFT) ev.data1=KEYD_LEFT;
+			if (e.key.keysym.sym==SDLK_RIGHT) ev.data1=KEYD_RIGHT;
+			if (e.key.keysym.sym==SDLK_LCTRL) ev.data1=KEYD_B;
+			if (e.key.keysym.sym==SDLK_SPACE) ev.data1=KEYD_A;
+			if (e.key.keysym.sym==SDLK_z) ev.data1=KEYD_L;
+			if (e.key.keysym.sym==SDLK_x) ev.data1=KEYD_R;
+			if (e.key.keysym.sym==SDLK_RETURN) ev.data1=KEYD_START;
+			if (e.key.keysym.sym==SDLK_TAB) ev.data1=KEYD_SELECT;
+			if (ev.data1!=-1) D_PostEvent(&ev);
 		}
 	}
-*/
 }
 
 void I_Quit() {

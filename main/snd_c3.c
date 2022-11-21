@@ -60,5 +60,7 @@ void snd_init(int samprate, snd_cb_t *cb) {
 
 	//GPIO1 is the inverse of GPIO0
 	esp_rom_gpio_connect_out_signal(1, I2SO_SD_OUT_IDX, 1, 0);
+	gpio_set_drive_capability(0, GPIO_DRIVE_CAP_3);
+	gpio_set_drive_capability(1, GPIO_DRIVE_CAP_3);
 }
 
