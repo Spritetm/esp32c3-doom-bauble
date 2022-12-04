@@ -498,12 +498,15 @@ static void blecent_next_state(int event, uint16_t conn_handle, int error, int a
 			BLE_UUID16_DECLARE(BLECENT_DSC_REP_REF), nth);
 		if (dsc == NULL) {
 			ESP_LOGE(TAG, "Error: Peer doesn't support the report reference characteristic");
+			ble_state=ST_WRITE_NOTIFY_DONE;
+			blecent_next_state(event, conn_handle, error, attr_handle, data);
+		} else {
+			int rc = ble_gattc_read(peer->conn_handle, dsc->dsc.handle, blecent_on_read, NULL);
+			if (rc != 0) {
+				ESP_LOGE(TAG, "Error: Failed to read characteristic; rc=%d",  rc);
+			}
+			ble_state=ST_READ_RPT_META;
 		}
-		int rc = ble_gattc_read(peer->conn_handle, dsc->dsc.handle, blecent_on_read, NULL);
-		if (rc != 0) {
-			ESP_LOGE(TAG, "Error: Failed to read characteristic; rc=%d",  rc);
-		}
-		ble_state=ST_READ_RPT_META;
 	} else if (ble_state==ST_READ_RPT_META) {
 		const struct peer_chr *chr = peer_chr_find_uuid_nth(peer,
 			BLE_UUID16_DECLARE(BLECENT_SVC_HID_UUID),

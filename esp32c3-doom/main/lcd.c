@@ -7,15 +7,18 @@
 #include "esp_system.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include "io.h"
+
+#define LCD_YOFF 3
 
 #define PIN_NUM_MISO -1
-#define PIN_NUM_MOSI 9
-#define PIN_NUM_CLK	 8
-#define PIN_NUM_CS	 5
+#define PIN_NUM_MOSI IO_LCD_MOSI
+#define PIN_NUM_CLK	 IO_LCD_CLK
+#define PIN_NUM_CS	 IO_LCD_CS
 
-#define PIN_NUM_DC	 7
-#define PIN_NUM_RST	 6
-#define PIN_NUM_BCKL 4
+#define PIN_NUM_DC	 IO_LCD_DC
+#define PIN_NUM_RST	 -1
+#define PIN_NUM_BCKL -1
 
 #define PARALLEL_LINES 4
 
@@ -263,19 +266,23 @@ void lcd_init_controller(spi_device_handle_t spi) {
 
 	//Initialize non-SPI GPIOs
 	gpio_config_t cfg = {
-		.pin_bit_mask = BIT64(PIN_NUM_DC) | BIT64(PIN_NUM_RST) | BIT64(PIN_NUM_BCKL),
+		.pin_bit_mask = BIT64(PIN_NUM_DC),
 		.mode = GPIO_MODE_OUTPUT,
 		.pull_up_en = false,
 		.pull_down_en = false,
 		.intr_type = GPIO_INTR_DISABLE,
 	};
+	if (PIN_NUM_BCKL!=-1) cfg.pin_bit_mask|=BIT64(PIN_NUM_BCKL);
+	if (PIN_NUM_RST!=-1) cfg.pin_bit_mask|=BIT64(PIN_NUM_RST);
 	gpio_config(&cfg);
 
-	//Reset the display
-	gpio_set_level(PIN_NUM_RST, 0);
-	vTaskDelay(pdMS_TO_TICKS(100));
-	gpio_set_level(PIN_NUM_RST, 1);
-	vTaskDelay(pdMS_TO_TICKS(100));
+	if (PIN_NUM_RST!=-1) {
+		//Reset the display
+		gpio_set_level(PIN_NUM_RST, 0);
+		vTaskDelay(pdMS_TO_TICKS(100));
+		gpio_set_level(PIN_NUM_RST, 1);
+		vTaskDelay(pdMS_TO_TICKS(100));
+	}
 
 	send_cmd_list(spi, Bcmd);
 	send_cmd_list(spi, Rcmd1);
@@ -283,7 +290,9 @@ void lcd_init_controller(spi_device_handle_t spi) {
 	send_cmd_list(spi, Rcmd3);
 
 	///Enable backlight
-	gpio_set_level(PIN_NUM_BCKL, 1);	//For some screens, you may need to set 1 to light its backlight
+	if (PIN_NUM_BCKL!=-1) {
+		gpio_set_level(PIN_NUM_BCKL, 1);	//For some screens, you may need to set 1 to light its backlight
+	}
 }
 
 
@@ -396,8 +405,7 @@ void lcd_render_fb(uint8_t *fb) {
 			}
 		}
 		send_line_finish(spi);
-//		send_lines(spi, yy, line);
-		send_lines(spi, yy+80, line); //HACK
+		send_lines(spi, yy+LCD_YOFF, line);
 		if (line==line_a) line=line_b; else line=line_a; //flip
 	}
 }

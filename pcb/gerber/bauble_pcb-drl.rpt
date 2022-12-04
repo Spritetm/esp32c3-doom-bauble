@@ -1,0 +1,23 @@
+Drill report for bauble_pcb.kicad_pcb
+Created on Tue 22 Nov 2022 11:59:23 AM CST
+
+Copper Layer Stackup:
+    =============================================================
+    L1 :  F.Cu                      front
+    L2 :  B.Cu                      back
+
+
+Drill file 'bauble_pcb-PTH.drl' contains
+    plated through holes:
+    =============================================================
+    T1  0.400mm  0.0157"  (18 holes)
+    T2  0.650mm  0.0256"  (10 holes)
+
+    Total plated holes count 28
+
+
+Drill file 'bauble_pcb-NPTH.drl' contains
+    unplated through holes:
+    =============================================================
+
+    Total unplated holes count 0

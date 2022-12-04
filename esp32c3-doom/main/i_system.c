@@ -53,6 +53,7 @@
 
 #include "global_data.h"
 #include "hid_ev.h"
+#include "usb_hid_keys.h"
 
 
 /* cphipps - I_GetVersionString
@@ -100,7 +101,15 @@ void I_ProcessKeyEvents() {
 	event_t ev;
 	while (input_get_event(&hev)) {
 		if (hev.type==HIDEV_EVENT_KEY_DOWN || hev.type==HIDEV_EVENT_KEY_UP) {
-			//todo: keyboard
+			ev.type=(hev.type==HIDEV_EVENT_KEY_DOWN)?ev_keydown:ev_keyup;
+			const int btns[]={KEYD_B, KEYD_A, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START, KEYD_UP, KEYD_DOWN, KEYD_LEFT, KEYD_RIGHT};
+			const int codes[]={KEY_Z, KEY_X, KEY_A, KEY_S, KEY_TAB, KEY_ENTER, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT};
+			for (int i=0; i<10; i++) {
+				if (hev.key.keycode==codes[i]) {
+					ev.data1=btns[i];
+					D_PostEvent(&ev);
+				}
+			}
 		} else if (hev.type==HIDEV_EVENT_JOY_AXIS && hev.no<2) {
 			ev.data1=hev.no?KEYD_DOWN:KEYD_RIGHT;
 			if (hev.joyaxis.pos>LIM && old_axis[hev.no]<=LIM) {
@@ -122,21 +131,39 @@ void I_ProcessKeyEvents() {
 
 			old_axis[hev.no]=hev.joyaxis.pos;
 		} else if (hev.type==HIDEV_EVENT_JOY_BUTTONDOWN || hev.type==HIDEV_EVENT_JOY_BUTTONUP) {
-			const int btns[]={KEYD_A, KEYD_B, KEYD_A, KEYD_B, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START};
+			const int btns[]={KEYD_B, KEYD_A, KEYD_B, KEYD_A, KEYD_L, KEYD_R, KEYD_SELECT, KEYD_START};
 			if (hev.no<8) {
 				ev.type=(hev.type==HIDEV_EVENT_JOY_BUTTONDOWN)?ev_keydown:ev_keyup;
 				ev.data1=btns[hev.no];
 				D_PostEvent(&ev);
 			}
 		} else if (hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN || hev.type==HIDEV_EVENT_MOUSE_BUTTONUP) {
-			const int btns[]={KEYD_A, KEYD_B, KEYD_START, KEYD_SELECT, KEYD_L, KEYD_R};
+			const int btns[]={KEYD_B, KEYD_A, KEYD_START, KEYD_SELECT, KEYD_L, KEYD_R};
 			if (hev.no<6) {
 				ev.type=(hev.type==HIDEV_EVENT_MOUSE_BUTTONDOWN)?ev_keydown:ev_keyup;
 				ev.data1=btns[hev.no];
 				D_PostEvent(&ev);
 			}
 		} else if (hev.type==HIDEV_EVENT_MOUSE_MOTION) {
-			//todo: mouse
+			ev.type=(hev.mouse_motion.dx>3)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_LEFT;
+			D_PostEvent(&ev);
+			ev.type=(hev.mouse_motion.dx<-3)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_RIGHT;
+			D_PostEvent(&ev);
+			ev.type=(hev.mouse_motion.dy>3)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_DOWN;
+			D_PostEvent(&ev);
+			ev.type=(hev.mouse_motion.dy<-3)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_UP;
+			D_PostEvent(&ev);
+		} else if (hev.type==HIDEV_EVENT_MOUSE_WHEEL) {
+			ev.type=(hev.mouse_wheel.d>1)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_L;
+			D_PostEvent(&ev);
+			ev.type=(hev.mouse_wheel.d<-1)?ev_keydown:ev_keyup;
+			ev.data1=KEYD_R;
+			D_PostEvent(&ev);
 		}
 	}
 }

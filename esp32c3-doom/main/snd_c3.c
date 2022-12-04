@@ -29,7 +29,7 @@ void snd_task(void *arg) {
 	}
 }
 
-void snd_init(int samprate, snd_cb_t *cb) {
+void snd_init(int samprate, snd_cb_t *cb, int pin_a, int pin_b) {
 	snd_cb=cb;
 
 	i2s_chan_config_t i2s_config={
@@ -46,7 +46,7 @@ void snd_init(int samprate, snd_cb_t *cb) {
 		.slot_cfg=I2S_PDM_TX_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO),
 		.gpio_cfg={
 			.clk=GPIO_NUM_NC,
-			.dout=0,
+			.dout=pin_a,
 		}
 	};
 	
@@ -59,8 +59,8 @@ void snd_init(int samprate, snd_cb_t *cb) {
 	vTaskDelay(pdMS_TO_TICKS(200));
 
 	//GPIO1 is the inverse of GPIO0
-	esp_rom_gpio_connect_out_signal(1, I2SO_SD_OUT_IDX, 1, 0);
-	gpio_set_drive_capability(0, GPIO_DRIVE_CAP_3);
-	gpio_set_drive_capability(1, GPIO_DRIVE_CAP_3);
+	esp_rom_gpio_connect_out_signal(pin_b, I2SO_SD_OUT_IDX, 1, 0);
+	gpio_set_drive_capability(pin_a, GPIO_DRIVE_CAP_3);
+	gpio_set_drive_capability(pin_b, GPIO_DRIVE_CAP_3);
 }
 

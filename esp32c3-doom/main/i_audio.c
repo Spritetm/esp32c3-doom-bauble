@@ -62,6 +62,7 @@
 #include "global_data.h"
 
 #include "snd_c3.h"
+#include "io.h"
 
 #include "dbopl.h"
 
@@ -207,7 +208,7 @@ void I_ShutdownSound(void)
 
 void I_InitSound(void) {
 	I_InitMusic();
-	snd_init(RATE, snd_cb);
+	snd_init(RATE, snd_cb, IO_SPK_A, IO_SPK_B);
 
 	// Finished initialization.
     lprintf(LO_INFO,"I_InitSound: sound ready");
