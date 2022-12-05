@@ -146,10 +146,10 @@ void I_ProcessKeyEvents() {
 			}
 		} else if (hev.type==HIDEV_EVENT_MOUSE_MOTION) {
 			ev.type=(hev.mouse_motion.dx>3)?ev_keydown:ev_keyup;
-			ev.data1=KEYD_LEFT;
+			ev.data1=KEYD_RIGHT;
 			D_PostEvent(&ev);
 			ev.type=(hev.mouse_motion.dx<-3)?ev_keydown:ev_keyup;
-			ev.data1=KEYD_RIGHT;
+			ev.data1=KEYD_LEFT;
 			D_PostEvent(&ev);
 			ev.type=(hev.mouse_motion.dy>3)?ev_keydown:ev_keyup;
 			ev.data1=KEYD_DOWN;

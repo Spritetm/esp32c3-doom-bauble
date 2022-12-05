@@ -7,7 +7,10 @@
  * ----------------------------------------------------------------------------
  */
 
-//Note that this is based on a design from RabbitEngineering: https://www.thingiverse.com/thing:3331061 which is licensed under CC-BY-NC.
+//Note that this is based on a design from RabbitEngineering: 
+//https://www.thingiverse.com/thing:3331061 which is licensed under CC-BY-NC.
+//Files for that are located in the files/ and images/ subdirectory. You will 
+//be bound to his license (=no commercial products) as long as you use his STLs.
 
 disp_sz=[28,13.5, 1.5];
 

@@ -748,9 +748,10 @@ static void D_DoomMainSetup(void)
 
     I_InitGraphics();
 
+	//Note: change this to #if 1 to record demo when compiling for sdl
 #if 0
-	G_RecordDemo("demo.lmp");
-	G_InitNew(sk_medium, 1, 7);
+	G_RecordDemo("demo.lmp"); //filename to write demo to
+	G_InitNew(sk_medium, 1, 7); //difficulty level, episode, map
 	G_BeginRecording();
 	return;
 #endif

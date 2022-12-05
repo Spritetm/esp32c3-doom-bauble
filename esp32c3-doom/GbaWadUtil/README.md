@@ -2,6 +2,7 @@ NOTE: This has been modified for the ESP32C3 version of Doom.
 
 Changes are that demos are replaced by the files in the 'demo' directory, and the original .mus music is replaced by the .imf equivalent in the 'music' directory.
 
+-Sprite_tm
 
 Original README.md:
 
